@@ -50,11 +50,17 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 .up { color: var(--up); } .down { color: var(--down); }
 
 .app { height: 100vh; display: grid; gap: 1px; background: var(--line);
-  grid-template-columns: 264px minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr);
-  grid-template-areas: "top top" "strip strip" "rail chart"; }
+  grid-template-columns: 264px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "top top" "rail chart"; }
 
 /* ---- toolbar ---- */
-.top { grid-area: top; background: var(--panel); display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 8px 14px; min-height: 52px; }
+.top { grid-area: top; background: var(--panel); display: flex; align-items: center; flex-wrap: nowrap; gap: 8px 14px; padding: 8px 14px; min-height: 52px; }
+.top { min-width: 0; }
+.app > * { min-width: 0; }
+.top > * { flex: none; }
+.top > .spacer { flex: 1 1 0; min-width: 0; }
+.top > .live { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+#liveTxt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.95rem; letter-spacing: -0.01em; white-space: nowrap; }
 .brand svg { color: var(--accent); }
 .vr { width: 1px; align-self: stretch; background: var(--line); }
@@ -94,10 +100,6 @@ a.ibtn { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) { .live.open i { animation: none; } }
 
 /* ---- market strip ---- */
-.strip { grid-area: strip; background: var(--panel); display: flex; align-items: center; gap: 18px; padding: 6px 14px; overflow-x: auto; white-space: nowrap; font-size: 0.78rem; color: var(--muted); min-height: 32px; }
-.strip b { font-family: var(--f-mono); font-weight: 600; color: var(--ink); }
-.strip .bar { display: inline-flex; width: 120px; height: 6px; border-radius: 3px; overflow: hidden; background: var(--raise); vertical-align: middle; margin-left: 6px; }
-.strip .bar i { display: block; height: 100%; }
 
 /* ---- watchlist ---- */
 .rail { grid-area: rail; background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
@@ -117,6 +119,9 @@ a.ibtn { text-decoration: none; }
 .row .chg { font-family: var(--f-mono); font-size: 0.74rem; text-align: right; }
 .row.idx .sym { font-size: 0.9rem; }
 .tag { font-size: 0.64rem; padding: 0 5px; border-radius: 4px; background: var(--raise); color: var(--muted); font-weight: 500; }
+.surge { font-family: var(--f-mono); font-size: 0.66rem; padding: 0 5px; border-radius: 4px; font-weight: 700; color: #7a4a00; background: rgba(245,165,36,.22); }
+:root[data-theme="dark"] .surge { color: var(--range); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .surge { color: var(--range); } }
 .score { font-family: var(--f-mono); font-size: 0.68rem; padding: 0 5px; border-radius: 4px; background: var(--raise); color: var(--muted); font-weight: 600; }
 .score.p { color: var(--up); background: var(--up-soft); } .score.m { color: var(--down); background: var(--down-soft); }
 .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; background: var(--muted); }
@@ -151,10 +156,51 @@ a.ibtn { text-decoration: none; }
 .lvbar:empty { display: none; }
 .lvbar .side { display: inline-flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
 .lvbar .k { color: var(--muted); } .lvbar .v { font-family: var(--f-mono); font-weight: 500; }
-.lvbar .tag { font-weight: 700; font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; color: #fff; }
+.lvbar .tag { font-weight: 700; font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; color: #fff; border: 0; cursor: pointer; font-family: var(--f-body); }
+.lvbar .tag:hover { filter: brightness(1.1); box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px currentColor; }
+/* ---- the desk: mood badge and day pill in the top bar, a panel from the right ---- */
+.mood { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 4px 10px; border-radius: 999px; cursor: pointer; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.mood i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.mood.trade i { background: var(--up); } .mood.small i { background: var(--range); } .mood.sit i { background: var(--down); }
+.mood .pl { font-family: var(--f-mono); font-weight: 600; padding-left: 8px; margin-left: 2px; border-left: 1px solid var(--line); }
+.desk { position: fixed; top: 0; right: 0; bottom: 0; z-index: 40; width: min(380px, 100vw); background: var(--panel); border-left: 1px solid var(--line); box-shadow: -16px 0 40px rgba(0,0,0,.25);
+  transform: translateX(105%); transition: transform .18s ease; display: flex; flex-direction: column; }
+.desk.on { transform: none; }
+@media (prefers-reduced-motion: reduce) { .desk { transition: none; } }
+.desk header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line); font-weight: 700; }
+.desk header button { border: 0; background: none; font-size: 1.3rem; line-height: 1; color: var(--muted); cursor: pointer; }
+.desk .body { overflow-y: auto; padding: 4px 14px 24px; display: grid; gap: 14px; }
+.desk h3 { margin: 10px 0 6px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.desk .box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--raise); font-size: 0.8rem; }
+.desk .moodbox b { font-size: 0.95rem; } .desk .moodbox ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 0.76rem; line-height: 1.45; }
+.desk .lockb { border-color: var(--down); background: var(--down-soft); color: var(--down); font-weight: 600; }
+.desk .sides { display: flex; gap: 4px; margin-bottom: 8px; }
+.desk .sides button { flex: 1; border: 1px solid var(--line); background: var(--panel); color: var(--muted); border-radius: 8px; padding: 6px; font-weight: 700; cursor: pointer; }
+.desk .sides button[aria-pressed="true"].buy { background: var(--up); border-color: var(--up); color: #fff; }
+.desk .sides button[aria-pressed="true"].sell { background: var(--down); border-color: var(--down); color: #fff; }
+.desk .kv { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 0.78rem; }
+.desk .kv span:nth-child(odd) { color: var(--muted); } .desk .kv span:nth-child(even) { font-family: var(--f-mono); text-align: right; }
+.desk .tgt { display: flex; gap: 4px; margin: 10px 0 8px; }
+.desk .tgt button { flex: 1; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 5px 4px; cursor: pointer; font-size: 0.72rem; color: var(--ink); }
+.desk .tgt button b { display: block; font-family: var(--f-mono); font-size: 0.76rem; }
+.desk .tgt button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.desk .go { width: 100%; border: 0; border-radius: 9px; padding: 10px; font-weight: 700; color: #fff; cursor: pointer; font-size: 0.86rem; }
+.desk .go.buy { background: var(--up); } .desk .go.sell { background: var(--down); }
+.desk .go[disabled] { background: var(--muted); opacity: .55; cursor: not-allowed; }
+.desk .why { margin: 6px 0 0; font-size: 0.72rem; color: var(--muted); line-height: 1.4; }
+.desk .err { color: var(--down); font-size: 0.76rem; margin: 6px 0 0; }
+.desk .tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.76rem; }
+.desk .tr:last-child { border-bottom: 0; }
+.desk .tr .pnl { font-family: var(--f-mono); font-weight: 600; text-align: right; }
+.desk .tr .sub { color: var(--muted); font-size: 0.7rem; }
+.desk .tr button { justify-self: end; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 0.7rem; color: var(--ink); }
+.desk form { display: grid; gap: 8px; }
+.desk label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--muted); }
+.desk label input[type=number] { width: 110px; font: 0.8rem var(--f-mono); padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); }
+.desk form button { justify-self: end; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 600; color: var(--ink); }
 .lvbar .st { color: var(--muted); font-size: 0.7rem; }
 /* the watchlist can be hidden: the chart takes the width */
-.app.norail { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "strip" "chart"; }
+.app.norail { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "chart"; }
 .app.norail .rail { display: none; }
 .legend .ln { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
 .legend .ttl { font-weight: 600; color: var(--ink); font-size: 0.82rem; }
@@ -162,7 +208,6 @@ a.ibtn { text-decoration: none; }
 .legend .v { font-family: var(--f-mono); }
 .chartmsg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--muted); z-index: 4; background: var(--panel); }
 .chartmsg.on { display: flex; }
-.cfoot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 6px 12px; border-top: 1px solid var(--line); font-size: 0.72rem; color: var(--muted); }
 
 .fine { color: var(--muted); font-size: 0.72rem; line-height: 1.5; }
 .err { color: var(--down); }
@@ -175,12 +220,18 @@ a.ibtn { text-decoration: none; }
 .toast button { float: right; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; margin-left: 8px; }
 
 /* ---- smaller screens ---- */
+@media (max-width: 1500px) {
+  .symhead .nm { display: none; }
+  #railBtn span { display: none; }
+}
 @media (max-width: 1200px) {
   .app { grid-template-columns: 240px minmax(0, 1fr); }
 }
 @media (max-width: 760px) {
-  .app { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 100vh; grid-template-rows: auto auto 60vh 300px; grid-template-areas: "top" "strip" "chart" "rail"; }
-  .app.norail { grid-template-rows: auto auto 75vh; grid-template-areas: "top" "strip" "chart"; }
+  .top { flex-wrap: wrap; position: relative; padding-right: 58px; }
+  .acct { position: absolute; top: 10px; right: 14px; }
+  .app { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 100vh; grid-template-rows: auto 64vh 300px; grid-template-areas: "top" "chart" "rail"; }
+  .app.norail { grid-template-rows: auto 80vh; grid-template-areas: "top" "chart"; }
   .chartbox { min-height: 300px; }
   .symhead .nm { display: none; }
   .legend .ln:nth-child(n+4) { display: none; }
@@ -210,6 +261,7 @@ a.ibtn { text-decoration: none; }
     </div>
     <span class="spacer"></span>
     <span class="live" id="live"><i></i><span id="liveTxt">Connecting…</span></span>
+    <button type="button" class="mood" id="moodBtn" title="Market mood and your paper desk"><i></i><span id="moodTxt">Desk</span><span class="pl" id="dayPl" hidden></span></button>
     <button type="button" class="ibtn" id="alertBtn" aria-pressed="false">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
       <span>Alerts off</span>
@@ -231,7 +283,6 @@ a.ibtn { text-decoration: none; }
     </details>
   </header>
 
-  <div class="strip" id="summary"><span>Loading the Nifty 50 (about 30 seconds the first time)…</span></div>
 
   <aside class="rail" aria-label="Watchlist">
     <div class="rail-head">
@@ -249,7 +300,6 @@ a.ibtn { text-decoration: none; }
 
   <section class="chartcol" aria-label="Chart">
     <div class="ctools">
-      <span class="lbl">Indicators</span>
       <button type="button" class="chip" data-ind="ut" aria-pressed="true"><i style="background:var(--up)"></i>UT Bot</button>
       <details class="pop" id="utPop">
         <summary aria-label="UT Bot settings" title="UT Bot settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></summary>
@@ -267,6 +317,7 @@ a.ibtn { text-decoration: none; }
         </div>
       </details>
       <button type="button" class="chip" data-ind="levels" aria-pressed="true"><i style="background:var(--range)"></i>Day levels</button>
+      <button type="button" class="chip" data-ind="vol" aria-pressed="true" title="⚡ a candle with 3× or more its usual volume for that time of day: big move likely, direction not known"><i style="background:var(--range)"></i>Volume ⚡</button>
     </div>
     <div class="lvbar" id="lvbar" aria-live="polite"></div>
     <div class="chartbox">
@@ -274,17 +325,20 @@ a.ibtn { text-decoration: none; }
       <div id="chart"></div>
       <div class="chartmsg" id="chartMsg"></div>
     </div>
-    <div class="cfoot"><span id="tfNote"></span><span id="utNote"></span></div>
   </section>
 
 </div>
 
+<aside class="desk" id="desk" aria-label="Paper desk" aria-hidden="true">
+  <header><span>Paper desk</span><button type="button" id="deskClose" aria-label="Close">×</button></header>
+  <div class="body" id="deskBody"></div>
+</aside>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <script>
 const IST = 19800, INDEX = 'NIFTY 50';
 const state = { byTime: new Map(), seen: null, alertsOn: false, audio: null, sym: INDEX, tf: '5m', filter: 'all', q: '', data: null, board: [], indexPx: {}, fitted: null,
-  ut: { on: true, key: 3, atr: 10, ha: true }, utSeen: null, show: { levels: true }, vals: {} };
+  ut: { on: true, key: 3, atr: 10, ha: true }, utSeen: null, show: { levels: true, vol: true }, vals: {} };
 try { const s = localStorage.getItem('nse-live-sym'); if (s) state.sym = s; const f = localStorage.getItem('nse-live-tf'); if (f) state.tf = f;
   // nse-live-ut3: the default moved to Calm (key 3, Heikin Ashi): a quarter of key 2's signals flipped back within
   // 6 candles, 7 % of Calm's. Older saved settings start over on it.
@@ -514,8 +568,10 @@ function renderLevelsBar() {
   bar.innerHTML = [lv.buy, lv.sell].map(x => {
     const buy = x.side === 'buy', col = buy ? 'var(--up)' : 'var(--down)';
     let st = x.status === 'trig' ? 'in ' + clock(x.etime) : x.status === 'none' ? 'no entry today' : 'waiting';
+    const tv = x.status === 'trig' && (state.data.tf || '5m') === '5m' && state.vals.vol ? state.vals.vol.get(state.data.bars[x.idx][0] + IST) : null;
+    if (tv) st += ' · ' + tv.toFixed(1) + '× vol';
     if (x.exit) st += ' · ' + { stop: 'SL hit', t3: 'T3 hit', flat: 'out' }[x.exit.how] + ' ' + clock(x.exit.m);
-    return '<span class="side"><span class="tag" style="background:' + col + '">' + (buy ? 'BUY' : 'SELL') + '</span>' +
+    return '<span class="side"><button type="button" class="tag" data-desk="' + x.side + '" title="Size it and paper-trade it" style="background:' + col + '">' + (buy ? 'BUY ▸' : 'SELL ▸') + '</button>' +
       '<span class="v" style="color:' + col + '">' + (buy ? '&gt; ' : '&lt; ') + fmt(x.entry) + '</span>' +
       '<span class="k">SL <span class="v">' + fmt(x.stop) + '</span></span>' +
       x.targets.map((t, n) => '<span class="k">T' + (n + 1) + ' <span class="v"' + (x.hits.length > n ? ' style="color:' + col + '"' : '') + '>' + fmt(t) + (x.hits.length > n ? ' ✓' : '') + '</span></span>').join('') +
@@ -539,6 +595,8 @@ function showLegend(time) {
     const u = v.ut && v.ut.get(t);
     if (u != null) h += '<span class="k">UT <span class="v" style="color:' + ((v.utSrc && v.utSrc.has(t) ? v.utSrc.get(t) : c[4]) > u ? css('--up') : css('--down')) + '">' + fmt(u) + '</span></span>';
   }
+  const vr = v.vol && v.vol.get(t);
+  if (vr) h += '<span class="k">Vol <span class="v"' + (vr >= SURGE ? ' style="color:var(--range);font-weight:700"' : '') + '>' + vr.toFixed(1) + '×' + (vr >= SURGE ? ' ⚡' : '') + '</span></span>';
   h += '</div>';
   box.innerHTML = h;
 }
@@ -547,6 +605,22 @@ const toMap = (pts) => new Map(pts.map(x => [x.time, x.value]));
 // closed, even when no forming 5-minute bar is in yet. The day's last candle ends with the 15:20 bar, the last one
 // Yahoo reliably has (its 15:25 bar is often missing).
 const SPAN = { '5m': 300, '15m': 900, '1h': 3600, '1d': 86400 };
+// Volume against the usual for that time of day (median of the same slot on up to 20 earlier sessions, at least
+// 3; daily candles against the earlier days). The same rule as volume_surge in live.py. 3x or more: a surge.
+// Tested on the saved Nifty 50 bars: the next 30 minutes moved 27 % more than usual, with no lean up or down.
+const SURGE = 3;
+function volRatios(cs, daily) {
+  const hist = new Map(), out = new Map();
+  for (const c of cs) {
+    const key = daily ? 0 : mins(c[0]), h = hist.get(key) || [];
+    if (h.length >= 3 && c[5] > 0) {
+      const w = h.slice(-20).sort((x, y) => x - y), usual = w[Math.floor(w.length / 2)];
+      if (usual > 0) out.set(c[0] + IST, c[5] / usual);
+    }
+    h.push(c[5]); hist.set(key, h);
+  }
+  return out;
+}
 function closedCandles(p, cs) {
   if (!cs.length || !p.bars.length) return cs;
   if (p.closed < p.bars.length) return cs.slice(0, -1);   // a forming 5-minute bar sits in the last candle
@@ -564,6 +638,7 @@ function renderChart() {
   chart.applyOptions({ timeScale: { timeVisible: !daily } });
   candles.setData(cs.map(b => ({ time: b[0] + IST, open: b[1], high: b[2], low: b[3], close: b[4] })));
   state.vals = {};
+  state.vals.vol = volRatios(cs, daily);
   lines.forEach(l => candles.removePriceLine(l)); lines = [];
     const mk = [];
   // the levels: the present trading day only (the session on the chart), from its 5-minute bars
@@ -590,20 +665,38 @@ function renderChart() {
     a.buy.targets.forEach((t, n) => tag(t, upc, 'T' + (n + 1)));
     a.sell.targets.forEach((t, n) => tag(t, dnc, 'T' + (n + 1)));
   }
+  // your paper trades on this stock today: entry, stop and target on the price scale
+  for (const t of (desk.data ? desk.data.book.trades : [])) {
+    if (t.symbol !== p.symbol || !['open', 'waiting'].includes(t.status)) continue;
+    const pc = css('--accent'), name = 'Paper ' + t.side.toUpperCase() + ' ' + t.qty;
+    lines.push(candles.createPriceLine({ price: t.fill ? t.fill.price : (t.side === 'buy' ? a.orH : a.orL), color: pc, title: name, lineWidth: 2, lineStyle: 1, axisLabelVisible: true }));
+    lines.push(candles.createPriceLine({ price: t.stop, color: dnc, title: 'Paper SL', lineWidth: 1, lineStyle: 1, axisLabelVisible: true }));
+    lines.push(candles.createPriceLine({ price: t.target, color: upc, title: 'Paper ' + t.target_name, lineWidth: 1, lineStyle: 1, axisLabelVisible: true }));
+  }
   levelLines.bg = css('--panel') + 'd9';
   levelLines.set(ln, bx);
   renderLevelsBar();
   // UT Bot on closed candles only: the forming candle's signal can still vanish before it closes
-  const note = document.getElementById('utNote');
   if (state.ut.on) {
     const done = closedCandles(p, cs), u = utBot(done, state.ut.key, state.ut.atr, state.ut.ha);
     const pts = done.map((b, i) => u.stops[i] === null ? null : { time: b[0] + IST, value: +u.stops[i].toFixed(2), color: u.src[i] > u.stops[i] ? upc : dnc }).filter(Boolean);
     ut.setData(pts); state.vals.ut = toMap(pts); state.vals.utSrc = new Map(done.map((b, i) => [b[0] + IST, u.src[i]]));
     utLabels.set(u.sig.map(([i, k]) => ({ time: done[i][0] + IST, kind: k, price: k === 'buy' ? done[i][3] : done[i][2], color: k === 'buy' ? upc : dnc })));
     const last = u.sig[u.sig.length - 1];
-    note.textContent = 'UT Bot on closed candles · key ' + state.ut.key + ', ATR ' + state.ut.atr + (state.ut.ha ? ', Heikin Ashi' : '');
     utAlert(p, last && done[last[0]], last && last[1]);
-  } else { ut.setData([]); utLabels.set([]); note.textContent = ''; }
+  } else { ut.setData([]); utLabels.set([]); }
+  // ⚡ on today's closed candles that traded 3x their usual volume or more (the index has no volume)
+  if (sh.vol) {
+    const amber = css('--range');
+    // one ⚡ where a run of surging candles starts (a news day can surge for hours); hover any candle for its Vol
+    let run = false;
+    for (const c of closedCandles(p, cs)) {
+      if (day(c[0]) !== p.session) continue;
+      const hot = state.vals.vol.get(c[0] + IST) >= SURGE;
+      if (hot && !run) mk.push({ time: c[0] + IST, position: 'aboveBar', color: amber, shape: 'circle', size: 0.6, text: '⚡' });
+      run = hot;
+    }
+  }
   mk.sort((x, y) => x.time - y.time);
   candles.setMarkers(mk);
   showLegend(null);
@@ -657,22 +750,23 @@ function renderList() {
       '<span class="st">' + (planText(state.indexPlan) || 'the whole market') + '</span>' +
       '<span class="chg ' + (chg >= 0 ? 'up' : 'down') + '">' + (r.last && r.prev_close ? signed(chg, 2) + '%' : '') + '</span>';
     else {
+      const sg = r.surge ? '<span class="surge" title="Volume ' + r.surge.ratio + '× usual at ' + esc(r.surge.at) + ': big move likely, direction not known">⚡' + r.surge.ratio + '×</span>' : '';
       b.innerHTML = '<span class="sym">' + esc(r.symbol) + (r.score != null ? ' <span class="score ' + cls(r.score) + '" title="' + esc(r.label) + '">' + signed(r.score, 0) + '</span>' : '') + '</span>' +
         '<span class="px">' + (r.last ? fmt(r.last) : '–') + '</span>' +
-        '<span class="st">' + (planText(r.plan) || (r.label || 'no read yet')) + '</span>' +
+        '<span class="st">' + sg + (sg ? ' ' : '') + (planText(r.plan) || (r.label || 'no read yet')) + '</span>' +
         '<span class="chg ' + (chg >= 0 ? 'up' : 'down') + '">' + signed(chg, 2) + '%</span>';
     }
     b.onclick = () => select(r.symbol);
     list.appendChild(b);
   });
-  if (!state.board.length && !q) list.insertAdjacentHTML('beforeend', '<p class="fine" style="padding:12px">Loading the Nifty 50 (about 30 seconds the first time)…</p>');
+  if (!state.board.length && !q) list.insertAdjacentHTML('beforeend', state.boardError ? '<p class="fine err" style="padding:12px">' + esc(state.boardError) + '</p>'
+    : '<p class="fine" style="padding:12px">Loading the Nifty 50 (about 30 seconds the first time)…</p>');
   else if (!all.length) list.innerHTML = '<p class="fine" style="padding:12px">No stocks match.</p>';
 }
 
 async function getJSON(u) { const r = await fetch(u); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j; }
 async function loadChart() {
   const sym = state.sym, tf = state.tf;
-  document.getElementById('tfNote').textContent = TF[tf].note + ' · drag or scroll to go back · double-click the price scale to reset';
   try {
     const d = await getJSON('/api/chart?sym=' + encodeURIComponent(sym) + '&tf=' + tf);
     if (sym !== state.sym || tf !== state.tf) return;
@@ -695,6 +789,20 @@ function toast(html, kind) {
   d.className = 'toast' + (kind ? ' ' + kind : ''); d.innerHTML = '<button type="button" aria-label="Dismiss">×</button>' + html;
   d.querySelector('button').onclick = () => d.remove();
   box.prepend(d); while (box.children.length > 4) box.lastChild.remove();
+}
+function checkSurges(day, rows) {
+  const key = 'nse-live-surge-' + day, hits = rows.filter(r => r.surge).map(r => ({ id: r.symbol + '@' + r.surge.at, r }));
+  if (!state.surgeSeen || state.surgeSeen.day !== day) {
+    let saved = null; try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) {}
+    state.surgeSeen = { day, set: new Set(saved || hits.map(h => h.id)) };   // first look today: no note for old ones
+  }
+  hits.filter(h => !state.surgeSeen.set.has(h.id)).forEach(({ id, r }) => {
+    state.surgeSeen.set.add(id);
+    const title = '⚡ ' + r.symbol + ' volume ' + r.surge.ratio + '× at ' + r.surge.at, body = 'Big move likely, direction not known. Watch the BUY / SELL levels. Nothing placed.';
+    toast('<b>' + esc(title) + '</b><br>' + esc(body));
+    if (state.alertsOn) { beep(); try { if (window.Notification && Notification.permission === 'granted') new Notification(title, { body }); } catch (e) {} }
+  });
+  try { localStorage.setItem(key, JSON.stringify([...state.surgeSeen.set])); } catch (e) {}
 }
 function checkBreakouts(day, rows) {
   const key = 'nse-live-seen-' + day;
@@ -739,22 +847,16 @@ async function loadStatus() {
     state.indexPx = { last: s.board.index_last, prev_close: s.board.index_prev_close };
     if (s.board.stocks.length) {
       state.board = s.board.stocks; renderList();
+      checkSurges(s.now.slice(0, 10), s.board.stocks);
       checkBreakouts(s.now.slice(0, 10), s.board.stocks.concat(s.board.index_plan ? [{ symbol: INDEX, plan: s.board.index_plan }] : []));
     }
-    const st = s.board.stocks, n = (f) => st.filter(f).length;
-    if (st.length) {
-      const bu = n(r => r.score >= 3), be = n(r => r.score <= -3), mid = st.length - bu - be, w = (x) => (100 * x / st.length).toFixed(1) + '%';
-      document.getElementById('summary').innerHTML =
-        '<span>Market <span class="bar"><i style="width:' + w(bu) + ';background:var(--up)"></i><i style="width:' + w(mid) + ';background:var(--muted);opacity:.35"></i><i style="width:' + w(be) + ';background:var(--down)"></i></span></span>' +
-        '<span class="up">Bullish <b class="up">' + bu + '</b></span><span>Neutral / leaning <b>' + mid + '</b></span><span class="down">Bearish <b class="down">' + be + '</b></span>' +
-        (s.board.breadth != null ? '<span>Above VWAP <b>' + Math.round(s.board.breadth * 100) + ' %</b></span>' : '') +
-        '<span class="up">Buy triggered <b class="up">' + n(r => trigSide(r.plan, 'buy')) + '</b></span>' +
-        '<span class="down">Sell triggered <b class="down">' + n(r => trigSide(r.plan, 'sell')) + '</b></span>' +
-        '<span>List updated <b>' + s.board.updated + '</b></span>';
-    } else if (s.board.error) document.getElementById('summary').innerHTML = '<span class="err">' + esc(s.board.error) + '</span>';
+    // the list could not load: say so in the watchlist
+    state.boardError = s.board.stocks.length ? null : s.board.error || null;
+    if (!s.board.stocks.length) renderList();
   } catch (e) { document.getElementById('liveTxt').textContent = 'Not connected: is live.py still running?'; }
 }
 function select(sym) {
+  if (typeof desk !== 'undefined' && desk.data) setTimeout(loadDesk, 0);
   state.sym = sym; try { localStorage.setItem('nse-live-sym', sym); } catch (e) {}
   try { history.replaceState(null, '', '?sym=' + encodeURIComponent(sym) + '&tf=' + state.tf); } catch (e) {}
   renderList(); loadChart();
@@ -829,7 +931,121 @@ function setRail(on) {
 document.getElementById('railBtn').addEventListener('click', () => setRail(document.querySelector('.app').classList.contains('norail')));
 { let r = null; try { r = localStorage.getItem('nse-live-rail'); } catch (e) {} setRail(r !== '0'); }
 
-initChart(); renderList(); select(state.sym); loadStatus();
+// ---------------------------------------------------------------- the paper desk: mood, calculator, paper trades, the lock
+// The server decides (chart_desk.py here, desk.js on the web): sizes, what may be traded and how trades end.
+const desk = { data: null, side: 'buy', target: 1, err: '', open: false };
+const rupee = (x) => (x < 0 ? '−' : x > 0 ? '+' : '') + '₹' + Math.abs(x).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+async function postDesk(path, body) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ('error ' + r.status));
+  return j;
+}
+async function loadDesk() {
+  try { desk.data = await getJSON('/api/desk?sym=' + encodeURIComponent(state.sym)); } catch (e) { desk.data = null; }
+  renderDesk(); if (state.data) renderChart();
+}
+function renderMood() {
+  const d = desk.data, b = document.getElementById('moodBtn'), pl = document.getElementById('dayPl');
+  if (!d) { b.className = 'mood'; document.getElementById('moodTxt').textContent = 'Desk'; pl.hidden = true; return; }
+  b.className = 'mood ' + d.mood.level; b.title = d.mood.reasons.join('\n');
+  document.getElementById('moodTxt').textContent = d.mood.label;
+  const bk = d.book; pl.hidden = !bk.trades.length && !bk.lock;
+  pl.textContent = rupee(bk.net) + ' · ' + bk.taken + '/' + bk.max_trades;
+  pl.style.color = bk.net > 0 ? 'var(--up)' : bk.net < 0 ? 'var(--down)' : '';
+}
+function renderDesk() {
+  renderMood();
+  const d = desk.data, body = document.getElementById('deskBody');
+  if (!d) { body.innerHTML = '<p class="why">The desk is not available right now.</p>'; return; }
+  const m = d.mood, bk = d.book, s = d.settings, lv = state.levels, side = desk.side, x = lv && lv.status === 'ready' ? lv[side] : null;
+  let h = '<h3>Market mood</h3><div class="box moodbox"><b class="mood ' + m.level + '" style="border:0;padding:0;background:none"><i></i> ' + esc(m.label) + '</b>' +
+    (m.factor === 0.5 ? ' <span class="why">· sizes are halved</span>' : '') + '<ul>' + m.reasons.map(r => '<li>' + esc(r) + '</li>').join('') + '</ul></div>';
+  if (bk.lock) h += '<div class="box lockb">🔒 ' + esc(bk.lock) + '</div>';
+  // the calculator for the stock on the chart
+  h += '<h3>Position · ' + esc(state.sym) + '</h3><div class="box">';
+  if (state.data && state.data.is_index) h += '<p class="why">The index cannot be bought or sold in the cash market: pick a stock from the watchlist.</p>';
+  else if (!d.sizes || !x) h += '<p class="why">Levels come at 9:30 AM, when the 9:15–9:30 range is in.</p>';
+  else {
+    const z = d.sizes[side], buy = side === 'buy';
+    h += '<div class="sides"><button type="button" class="buy" data-side="buy" aria-pressed="' + buy + '">BUY</button><button type="button" class="sell" data-side="sell" aria-pressed="' + !buy + '">SELL</button></div>';
+    const how = x.status === 'trig' ? 'Triggered ' + clock(x.etime) + ': a paper trade enters at the last price.' : x.status === 'none' ? 'No entry today.'
+      : 'Armed: fills when a 5-minute candle closes ' + (buy ? 'above ' : 'below ') + fmt(x.entry) + ' (by ' + esc(s.no_entries_after) + ').';
+    if (!z.qty) h += '<p class="err">No trade: ' + esc(z.refusal || '0 shares') + '.</p>';
+    else {
+      h += '<div class="kv"><span>Shares</span><span><b>' + z.qty + '</b></span><span>Entry · stop</span><span>' + fmt(z.entry) + ' · ' + fmt(z.stop) + '</span>' +
+        '<span>Money used</span><span>₹' + fmt(z.cost) + '</span><span>Loss at stop (with charges)</span><span style="color:var(--down)">−₹' + fmt(z.loss_at_stop) + '</span>' +
+        '<span>Money in other trades</span><span>₹' + fmt(bk.in_use || 0) + '</span><span>Limited by</span><span>' + esc(z.bound_by) + (z.factor === 0.5 ? ' · half size' : '') + '</span></div>';
+      h += '<div class="tgt">' + z.targets.map((t, i) => '<button type="button" data-t="' + (i + 1) + '" aria-pressed="' + (desk.target === i + 1) + '">T' + (i + 1) + ' ' + (x.hits && x.hits.length > i ? '✓' : '') +
+        '<b style="color:' + (t.net >= 0 ? 'var(--up)' : 'var(--down)') + '">' + rupee(t.net) + '</b></button>').join('') + '</div>';
+    }
+    const running = bk.trades.some(t => t.symbol === state.sym && ['open', 'waiting'].includes(t.status));
+    const blocked = running || bk.lock || !z.qty || x.status === 'none' || ['closed', 'wait', 'sit'].includes(m.level) || (!buy && !s.allow_short);
+    const why = running ? 'You already have a paper trade on ' + state.sym + ': exit or cancel it first.' : m.level === 'closed' ? m.reasons[0] : bk.lock ? bk.lock : !buy && !s.allow_short ? 'Short selling is off: turn on "Allow SELL (short)" below.' : ['closed', 'wait', 'sit'].includes(m.level) ? m.reasons[0] : '';
+    h += '<button type="button" class="go ' + side + '" id="deskGo"' + (blocked ? ' disabled' : '') + '>Paper ' + (buy ? 'BUY' : 'SELL') + ' ' + (z.qty || '') + ' · T' + desk.target + '</button>' +
+      '<p class="why">' + esc(why || how) + ' Out at the stop, T' + desk.target + ' or ' + esc(s.flat_by) + '. Charges counted. Nothing is sent to a broker.</p>' +
+      (desk.err ? '<p class="err">' + esc(desk.err) + '</p>' : '');
+  }
+  h += '</div>';
+  // today's paper trades
+  h += '<h3>Today · ' + rupee(bk.net) + ' · ' + bk.taken + ' of ' + bk.max_trades + ' trades · loss limit ₹' + fmt(bk.max_daily_loss) + '</h3><div class="box">';
+  if (!bk.trades.length) h += '<p class="why">No paper trades today.</p>';
+  for (const t of bk.trades.slice().reverse()) {
+    const st = t.status === 'open' ? 'open' : t.status === 'waiting' ? 'waiting for the trigger' : t.status === 'cancelled' ? 'cancelled (no trigger)' :
+      ({ stop: 'stopped', target: t.target_name + ' hit', flat: 'out at ' + esc(s.flat_by), manual: 'exited' }[t.exit.how] + ' ' + t.exit.time);
+    h += '<div class="tr"><span><b style="color:' + (t.side === 'buy' ? 'var(--up)' : 'var(--down)') + '">' + t.side.toUpperCase() + '</b> ' + esc(t.symbol) + ' × ' + t.qty + ' · ' + t.target_name + '</span>' +
+      '<span class="pnl" style="color:' + (t.pnl > 0 ? 'var(--up)' : t.pnl < 0 ? 'var(--down)' : 'inherit') + '">' + (t.fill ? rupee(t.pnl) : '–') + '</span>' +
+      '<span class="sub">' + (t.fill ? 'in ' + fmt(t.fill.price) + ' ' + t.fill.time + ' · ' : 'placed ' + t.placed + ' · ') + st + (t.fill ? ' · charges ₹' + fmt(t.charges) : '') + '</span>' +
+      (t.status === 'open' || t.status === 'waiting' ? '<button type="button" data-exit="' + t.id + '">' + (t.status === 'open' ? 'Exit now' : 'Cancel') + '</button>' : '<span></span>') + '</div>';
+  }
+  h += '</div>';
+  // the settings
+  h += '<h3>Your limits</h3><form id="deskSet" class="box">' +
+    '<label>Budget (₹) <input type="number" name="budget" min="1" step="1000" value="' + s.budget + '"></label>' +
+    '<label>Max loss a trade (₹) <input type="number" name="max_loss_per_trade_inr" min="1" step="50" value="' + s.max_loss_per_trade_inr + '"></label>' +
+    '<label>Max loss a day (₹) <input type="number" name="max_daily_loss_inr" min="1" step="100" value="' + s.max_daily_loss_inr + '"></label>' +
+    '<label>Trades a day <input type="number" name="max_trades_per_day" min="1" max="50" step="1" value="' + s.max_trades_per_day + '"></label>' +
+    '<label>Allow SELL (short, intraday only) <input type="checkbox" name="allow_short"' + (s.allow_short ? ' checked' : '') + '></label>' +
+    '<button type="submit">Save</button></form>' +
+    '<p class="why">Paper only. Sizes keep the loss at the stop, charges included, within your max loss a trade and what is left of today\'s. The mood is measured on 59 past sessions; it describes, it does not predict.</p>';
+  body.innerHTML = h;
+}
+function openDesk(side) {
+  if (side) desk.side = side;
+  desk.err = ''; desk.open = true;
+  const el = document.getElementById('desk'); el.classList.add('on'); el.setAttribute('aria-hidden', 'false');
+  loadDesk();
+}
+document.getElementById('moodBtn').addEventListener('click', () => openDesk());
+document.getElementById('deskClose').addEventListener('click', () => { desk.open = false; const el = document.getElementById('desk'); el.classList.remove('on'); el.setAttribute('aria-hidden', 'true'); });
+document.getElementById('lvbar').addEventListener('click', (e) => { const b = e.target.closest('[data-desk]'); if (b) openDesk(b.dataset.desk); });
+document.getElementById('deskBody').addEventListener('click', async (e) => {
+  const sideB = e.target.closest('[data-side]'), tB = e.target.closest('[data-t]'), exitB = e.target.closest('[data-exit]');
+  if (sideB) { desk.side = sideB.dataset.side; desk.err = ''; renderDesk(); return; }
+  if (tB) { desk.target = +tB.dataset.t; renderDesk(); return; }
+  if (e.target.id === 'deskGo') {
+    e.target.disabled = true;
+    try { desk.data = await postDesk('/api/desk/trade', { sym: state.sym, side: desk.side, target: desk.target }); desk.err = ''; toast('<b>Paper ' + desk.side.toUpperCase() + ' ' + esc(state.sym) + '</b><br>Recorded. Nothing was sent to a broker.'); }
+    catch (err) { desk.err = err.message; }
+    renderDesk(); renderChart(); return;
+  }
+  if (exitB) {
+    try { desk.data = await postDesk('/api/desk/exit', { id: +exitB.dataset.exit }); } catch (err) { desk.err = err.message; }
+    renderDesk(); renderChart();
+  }
+});
+document.getElementById('deskBody').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, data = { sym: state.sym, allow_short: f.allow_short.checked };
+  for (const k of ['budget', 'max_loss_per_trade_inr', 'max_daily_loss_inr', 'max_trades_per_day']) data[k] = +f[k].value;
+  try { desk.data = await postDesk('/api/desk/settings', data); desk.err = ''; toast('<b>Limits saved</b>'); } catch (err) { desk.err = err.message; }
+  renderDesk();
+});
+
+const deskQ = new URLSearchParams(location.search).get('desk');      // read before select() rewrites the address
+initChart(); renderList(); select(state.sym); loadStatus(); loadDesk();
+if (deskQ) openDesk(deskQ === 'sell' ? 'sell' : 'buy');
+setInterval(loadDesk, 30000);
 setInterval(loadChart, 30000);
 setInterval(loadStatus, 30000);
 </script>

@@ -5,8 +5,9 @@
 import PAGE from '../../nse-chart/page.html';
 import LOGIN_PAGE from './login.html';
 import { signedIn, authRoute } from './auth.js';
+import * as desk from './desk.js';
 import {
-  INDEX, NIFTY50, ChartError, canon, yahooSymbol, parseChart, payload, closedBars, orbPlan,
+  INDEX, NIFTY50, ChartError, canon, yahooSymbol, parseChart, payload, closedBars, orbPlan, volumeSurge,
   backtest, describeBacktest, resample, marketState, lastClose, dateOf, stamp,
 } from './core.js';
 
@@ -108,7 +109,7 @@ async function refreshPart(env, part, now) {
       const today = p.session === dateOf(now) ? p.bars : null;
       rows.push({ symbol: sym, last: p.bars.length ? p.bars[p.bars.length - 1][4] : null, prev_close: p.prev_close,
         score: p.bias ? p.bias.score : null, label: p.bias ? p.bias.label : null,
-        plan: today ? orbPlan(sym, today, now) : null, vwap_vote: v ? v.vote : 0 });
+        plan: today ? orbPlan(sym, today, now) : null, surge: volumeSurge(b, now), vwap_vote: v ? v.vote : 0 });
     } catch (e) {
       failed.push(sym);
     }
@@ -178,6 +179,69 @@ async function record(env, sym, now) {
   return remember(key, bt);
 }
 
+// ---------------------------------------------------------------- the desk (desk.js): each signed-in person's own,
+// kept in D1 under desk:<email>. Paper trades only.
+
+async function deskDoc(env, email) {
+  const row = await env.DB.prepare('SELECT v FROM kv WHERE k = ?').bind('desk:' + email).first();
+  return row ? JSON.parse(row.v) : { settings: {}, trades: [] };
+}
+const deskSave = (env, email, doc) => put(env, 'desk:' + email, doc);
+async function todayBars(env, sym, now) {
+  const p = await chart(env, sym, '5m', now);
+  return p.session === dateOf(now) ? p.bars : [];
+}
+async function deskState(env, doc, now) {
+  const s = desk.settingsFrom(doc.settings), day = dateOf(now), bySym = {};
+  for (const t of doc.trades) if (t.placed.slice(0, 10) === day && !bySym[t.symbol]) bySym[t.symbol] = await todayBars(env, t.symbol, now);
+  const book = desk.dayBook(doc.trades, bySym, now, s);
+  const rows = (await status(env, now)).board.stocks || [];
+  return { s, book, md: desk.mood(rows, now, book, marketState(now)[0] === 'open') };
+}
+async function deskView(env, email, sym, now) {
+  const doc = await deskDoc(env, email), { s, book, md } = await deskState(env, doc, now);
+  const out = { settings: s, book, mood: md, sizes: null };
+  if (sym && sym !== INDEX) {
+    const today = await todayBars(env, sym, now), plan = today.length ? orbPlan(sym, today, now) : null;
+    if (plan && plan.status === 'ready') {
+      out.sizes = {};
+      for (const side of ['buy', 'sell']) out.sizes[side] = desk.sizeTrade(side, plan[side].entry, plan[side].stop, plan[side].targets, s, book.realized, md.factor || 1, book.in_use);
+    }
+  }
+  return out;
+}
+async function deskPost(env, email, path, data, now) {
+  const doc = await deskDoc(env, email), nowText = stamp(now).slice(0, 16);
+  if (path === '/api/desk/settings') {
+    doc.settings = Object.assign({}, doc.settings, desk.cleanSettings(data));
+    await deskSave(env, email, doc);
+    return deskView(env, email, data.sym ? canon(data.sym) : null, now);
+  }
+  if (path === '/api/desk/trade') {
+    const sym = canon(data.sym);
+    if (!sym || sym === INDEX) throw new desk.DeskError('Pick a stock: the index cannot be bought or sold in the cash market.');
+    const { s, book, md } = await deskState(env, doc, now);
+    const today = (await todayBars(env, sym, now)).filter(b => b[0] + 300 <= now);
+    const t = desk.newTrade(sym, today.length ? orbPlan(sym, today, now) : null, String(data.side), Number(data.target) || 1,
+      today.length ? today[today.length - 1] : null, nowText, s, book, md, Math.max(0, ...doc.trades.map(x => x.id)) + 1);
+    doc.trades.push(t);
+    doc.trades = doc.trades.filter(x => x.placed >= stamp(now - 40 * 86400));    // keep 40 days
+    await deskSave(env, email, doc);
+    return deskView(env, email, sym, now);
+  }
+  if (path === '/api/desk/exit') {
+    const t = doc.trades.find(x => x.id === data.id);
+    if (!t || t.placed.slice(0, 10) !== dateOf(now)) throw new desk.DeskError('No such trade today.');
+    const done = (await todayBars(env, t.symbol, now)).filter(b => b[0] + 300 <= now);
+    if (!done.length) throw new desk.DeskError('No closed bar yet.');
+    const last = done[done.length - 1];
+    t.exit = { price: last[4], time: stamp(last[0] + 300).slice(11, 16) };
+    await deskSave(env, email, doc);
+    return deskView(env, email, t.symbol, now);
+  }
+  return null;
+}
+
 async function status(env, now) {
   const [state, words] = marketState(now);
   const b = Object.assign({}, await board(env));
@@ -231,6 +295,20 @@ export default {
         return new Response(page, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin' } });
       }
       if (url.pathname === '/api/status') return json(200, await status(env, now));
+      if (url.pathname === '/api/desk' && request.method === 'GET') return json(200, await deskView(env, email, url.searchParams.get('sym') ? sym : null, now));
+      if (url.pathname.startsWith('/api/desk/')) {
+        const origin = request.headers.get('Origin');
+        if (request.method !== 'POST' || (origin && origin !== url.origin) || !(request.headers.get('Content-Type') || '').includes('application/json')) return json(400, { error: 'Bad request.' });
+        let data = {};
+        try { data = await request.json(); } catch (e) { return json(400, { error: 'Bad request.' }); }
+        try {
+          const out = await deskPost(env, email, url.pathname, data, now);
+          return out ? json(200, out) : json(404, { error: 'not found' });
+        } catch (e) {
+          if (e instanceof desk.DeskError || /must be/.test(e.message)) return json(400, { error: e.message });
+          throw e;
+        }
+      }
       if (url.pathname === '/api/chart') return json(200, await chart(env, sym, tf, now));
       if (url.pathname === '/api/backtest') return json(200, await record(env, sym, now));
       return json(404, { error: 'not found' });

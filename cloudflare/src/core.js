@@ -333,6 +333,22 @@ export function orbPlan(sym, today, now) {
   return out;
 }
 
+// The last closed 5-minute bar of today against the usual volume for that time of day (volume_surge in
+// chart_signals.py): the median of the same slot on up to 20 earlier sessions, at least 3. Big move likely,
+// direction not known.
+export function volumeSurge(bars, now, times = 3, days = 20) {
+  const done = bars.filter(b => b[0] + BAR <= now);
+  if (!done.length) return null;
+  const last = done[done.length - 1], d = dateOf(last[0]), slot = minuteOf(last[0]);
+  if (d !== dateOf(now)) return null;
+  const hist = done.slice(0, -1).filter(b => minuteOf(b[0]) === slot && dateOf(b[0]) < d).map(b => b[5]).slice(-days);
+  if (hist.length < 3 || !(last[5] > 0)) return null;
+  const usual = hist.slice().sort((x, y) => x - y)[Math.floor(hist.length / 2)];
+  if (!(usual > 0)) return null;
+  const r = last[5] / usual;
+  return r >= times ? { ratio: Math.floor(r * 10 + 0.5) / 10, at: hhmm(last[0] + BAR) } : null;
+}
+
 // Today's 5-minute payload: the session's bars, the previous close and the bias read at the last closed bar.
 export function payload(sym, bars, meta, now, breadth = null) {
   if (!bars.length) throw new ChartError('No bars for ' + sym);

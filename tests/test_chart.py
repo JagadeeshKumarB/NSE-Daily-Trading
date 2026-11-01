@@ -95,6 +95,28 @@ class Plan(unittest.TestCase):
         self.assertEqual(b["exit"], {"how": "t3", "price": 107.0, "time": "09:45"})
 
 
+class VolumeSurge(unittest.TestCase):
+    def bars(self, now):
+        clock = live.Clock(now)
+        return live.Source(clock, BUNDLE).chart("TRENT", "60d")[0], clock.now()
+
+    def test_trent_traded_six_times_its_usual_volume_at_two(self):
+        bars, now = self.bars("2026-10-30 14:05")
+        self.assertEqual(live.volume_surge(bars, now), {"ratio": 6.0, "at": "14:05"})
+
+    def test_a_usual_bar_is_no_surge_and_neither_is_yesterday(self):
+        bars, now = self.bars("2026-10-30 14:10")        # the 14:05 bar: 2.1x, under 3x
+        self.assertIsNone(live.volume_surge(bars, now))
+        bars, now = self.bars("2026-10-30 09:10")        # nothing closed today yet
+        self.assertIsNone(live.volume_surge(bars, now))
+
+    def test_the_page_carries_the_same_rule(self):
+        with open(live.PAGE, encoding="utf-8") as fh:
+            page = fh.read()
+        self.assertIn("function volRatios(cs, daily)", page)
+        self.assertIn("const SURGE = 3;", page)
+
+
 class UTBot(unittest.TestCase):
     def test_icicibank_signals_on_october_30(self):
         clock = live.Clock("2026-10-30 15:40")

@@ -45,8 +45,8 @@ class PageMatchesDoc(unittest.TestCase):
 
     def test_indicator_switches(self):
         chips = re.findall(r'class="chip" data-ind="\w+"[^>]*><i[^>]*></i>([^<]+)</button>', PAGE)
-        self.assertEqual(chips, ["UT Bot", "Day levels"])
-        self.assertIn("Indicator switches over the chart: UT Bot and Day levels", doc_row("Chart"))
+        self.assertEqual(chips, ["UT Bot", "Day levels", "Volume ⚡"])
+        self.assertIn("Indicator switches over the chart: UT Bot, Day levels and Volume ⚡", doc_row("Chart"))
 
     def test_ut_bot_presets_and_the_calm_default(self):
         presets = re.findall(r'<button type="button" data-k="([\d.]+)" data-a="(\d+)" data-h="([01])">(\w+)</button>', PAGE)

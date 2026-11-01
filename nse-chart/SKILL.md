@@ -57,12 +57,13 @@ when there is no read or Yahoo did not answer (the reason is one plain line).
 
 | part | what |
 | --- | --- |
-| Toolbar | the symbol, last price and change, the timeframe (5m, 15m, 1H, 1D), Live (green dot) during 9:15 to 15:30 IST on NSE trading days (otherwise the last session, with the reason), the alerts switch and a light / dark theme switch. Under it, a market strip: how many stocks read Bullish, Neutral or Bearish, breadth above VWAP, breakouts |
+| Toolbar | the symbol, last price and change, the timeframe (5m, 15m, 1H, 1D), Live (green dot) during 9:15 to 15:30 IST on NSE trading days (otherwise the last session, with the reason), the alerts switch and a light / dark theme switch. A **Watchlist** button hides or shows the list (remembered in the browser). Kept to one line on a computer; the status text shortens with … when room runs out |
 | Watchlist | NIFTY 50 pinned on top, then the 50 stocks: bias score, last price, change on the previous close and the plan in one line. Search, and filters: Broke out, Bullish (+3 or more), Bearish (−3 or less) |
-| Chart | candles on 5m, 15m, 1H or 1D, opening on the last few sessions; drag or scroll left for earlier days. Indicator switches over the chart: UT Bot and Day levels (the shaded opening range, the BUY and SELL lines, T1 to T3 each side, and where each side went in and out). Top left, like TradingView: open, high, low, close and the UT Bot stop at the candle under the mouse. EMA and VWAP are not drawn; the bias still counts them. `?sym=ICICIBANK&tf=15m` in the address opens that chart |
+| Chart | candles on 5m, 15m, 1H or 1D, opening on the last few sessions; drag or scroll left for earlier days. Indicator switches over the chart: UT Bot, Day levels and Volume ⚡ (see **Volume surge** below), Day levels (the shaded opening range, the BUY and SELL lines, T1 to T3 each side, and an arrow and a dot where each side went in and out). Nothing is written on the candles: today's levels are in a bar above the chart and tagged on the price scale. Top left, one line like TradingView: open, high, low, close and the UT Bot stop at the candle under the mouse. EMA and VWAP are not drawn; the bias still counts them. `?sym=ICICIBANK&tf=15m` in the address opens that chart |
 | UT Bot Alerts | TradingView's UT Bot: a dotted ATR trailing stop (green under price, red over it) and **Buy** / **Sell** labels where the close crosses it. On by default. Settings icon next to its switch: presets Sensitive (key 1, TradingView's default), Balanced (key 2), Calm (key 3, Heikin Ashi, the default here), or your own key, ATR period and Heikin Ashi switch |
+| Hosted copy | `cloudflare/` serves the same page at **nselive.pages.dev**, behind its own sign-in: only invited emails get a 6-digit code by email (it works once, for 10 minutes); the account button top right shows who is signed in and **Sign out** |
 | Bias | not on the page: the watchlist shows each stock's score (and filters Bullish / Bearish); `live.py bias SYMBOL` gives the full read and `live.py backtest SYMBOL` its 60-session record |
-| Day levels | see **The day's levels** below: set at 9:30 AM every day and drawn from then on, with today's also on the price scale and in the legend top left (✓ on each target hit). Only the present trading day is drawn; earlier days stay clean candles. The watchlist line: `buy > 1,390.90 · sell < 1,383.40` until a side triggers, then `▲ 09:35 → T1 ✓` (▲ buy, ▼ sell) |
+| Day levels | see **The day's levels** below: set at 9:30 AM every day and drawn from then on, with today's also on the price scale and in the levels bar above the chart: `BUY > entry · SL · T1 · T2 · T3 · in 9:35 AM` and the same for SELL (✓ on each target hit). Only the present trading day is drawn; earlier days stay clean candles. The watchlist line: `buy > 1,390.90 · sell < 1,383.40` until a side triggers, then `▲ 09:35 → T1 ✓` (▲ buy, ▼ sell) |
 
 How far back each timeframe goes is Yahoo's free limit: 5m and 15m, the last
 60 sessions (15m is built from the 5-minute bars, from 9:15); 1H, about a year;
@@ -92,6 +93,55 @@ Five votes, each +1, 0 or −1, on closed 5-minute bars:
 bullish**, −1 or −2 **Leaning bearish**, 0 **Neutral**. The index has no
 volume on Yahoo, so its fifth vote is breadth, and breadth needs the list to
 have loaded once.
+
+## The paper desk (mood, calculator, paper trades, the daily lock)
+
+The **mood** button in the top bar (Trade, Trade small, Sit out, with today's
+paper P&L and trades used, `−₹73.34 · 2/3`) and the **BUY ▸ / SELL ▸** tags in
+the levels bar open the desk, a panel on the right. `chart_desk.py` decides
+(the Worker repeats it in `cloudflare/src/desk.js`; `cloudflare/test-desk.mjs`
+keeps the two equal); trades live in `trader/state/chart-desk.json` here and
+under your email in D1 on the web. Paper only: nothing reaches a broker.
+
+| part | what |
+| --- | --- |
+| Mood | **Trade**; **Trade small** (half size) once 60 % or more of at least 5 of today's resolved breakouts hit the stop before T1; **Sit out** when the day is locked or after 2:30 PM; **Wait for 9:30** before the range is in. With the reasons, and a note on the 9:35 to 10:00 window |
+| Calculator | the stock on the chart, BUY or SELL: shares that keep the loss at the stop, charges counted, within your max loss a trade (halved on a Trade small day) and what is left of today's loss limit, and within the position cap, max order and the budget less its buffer and less the money in your open trades; money used, loss at the stop, P&L after charges at T1, T2 and T3 |
+| Paper trade | one a stock at a time. Not triggered yet: armed at the level, fills on its trigger (a 5-minute close beyond it, by 2:30 PM). Triggered: at the last close, unless the stop is hit or the chosen target passed. Out at the stop, the target or 15:10 (a bar touching both counts as the stop); Exit now or Cancel by hand. Drawn on the chart: Paper BUY 53, Paper SL, Paper T1 |
+| Daily lock | when less than a quarter of one trade's max loss is left of today's limit, or the trades a day are used, or after 2:30 PM: **Sit out**, a red banner, and the server refuses new paper trades |
+| Your limits | budget, max loss a trade, max loss a day, trades a day, Allow SELL (short, intraday only; off by default). Start from `trader/config.json`; changes are kept with the desk |
+
+**What the mood is built on**, on the saved Nifty 50 bars (50 stocks, 59
+sessions, every BUY and SELL that triggered, out at T1): charges cost about
+0.13R a trade at a ₹500 risk; after charges, breakouts from 9:35 to 10:00 made
++0.06R (T1 49 %), 10:05 to 11:00 −0.04R (T1 39 %), later +0.03R (T1 34 % then
+22 %); once 60 % of the day's resolved breakouts had hit the stop, the next
+ones made +0.06R before charges against +0.13 to +0.15R (118 trades, a small
+sample). Nothing known at 9:30 (stock gaps, opening-range width, yesterday's
+chop, India VIX) told a bad day from a good one: 7 bad days in 59, spread
+evenly. So the mood never says a day will be good; it says when the day has
+turned choppy, when the best window is, and when your own limits say stop.
+
+## Volume surge (⚡)
+
+A candle that traded **3× or more its usual volume for that time of day** (the
+median of the same 5-minute slot on up to 20 earlier sessions; daily candles
+against earlier days) gets a ⚡ on today's chart, one where each run of such
+candles starts. Hover any candle for its `Vol 2.4×`. A watchlist stock whose
+last closed bar surged shows `⚡ 6.8×` (a note on the page; with Alerts on, a
+sound and a notification), and a BUY or SELL that triggered on a surge reads
+`in 9:35 AM · 3.4× vol` in the levels bar. `volume_surge` in `chart_signals.py`,
+the same rule in the Worker and the page.
+
+**It says a big move is likely, not which way.** On the saved Nifty 50 bars
+(50 stocks, 60 sessions, 173,100 half-hour windows), after a surge the next 30
+minutes moved 27 % more than usual (0.27 % against 0.21 %) and a big move came
+31 % of the time against 22.5 %. The direction was right 48 to 51 % of the
+time whichever way it was read (candle colour, close near the high or low,
+VWAP side, the day's trend, all three together, or fading the candle): a coin
+flip. A squeeze (Bollinger inside Keltner) did nothing on these stocks. A
+breakout on 2× volume or more was stopped before T1 less often (21 % against
+26 %) but reached T1 no more often (39 % both). Never call a ⚡ a buy or a sell.
 
 ## UT Bot Alerts
 

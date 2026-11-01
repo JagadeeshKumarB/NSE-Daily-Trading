@@ -38,6 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from chart_data import *  # noqa: E402,F401,F403
 from chart_signals import *  # noqa: E402,F401,F403
 from chart_alerts import *  # noqa: E402,F401,F403
+import chart_desk  # noqa: E402
 
 # ---------------------------------------------------------------- the store
 
@@ -140,7 +141,8 @@ class Store:
                 today = self.today.get(sym, [])
             plan = orb_plan(sym, today, self.clock.now()) if today and today[0][0].date() == self.clock.now().date() else None
             rows.append({"symbol": sym, "last": last, "prev_close": p["prev_close"],
-                         "score": b["score"] if b else None, "label": b["label"] if b else None, "plan": plan})
+                         "score": b["score"] if b else None, "label": b["label"] if b else None, "plan": plan,
+                         "surge": volume_surge(bars, self.clock.now())})
         with self.lock:
             self.board = {"stocks": rows, "breadth": (above / counted) if counted else None,
                           "updated": self.clock.now().strftime("%H:%M:%S"), "failed": failed, "error": None}
@@ -176,6 +178,106 @@ class Store:
                 "offline": self.source.bundle is not None, "board": board}
 
 
+# ---------------------------------------------------------------- the desk (chart_desk.py): paper trades, the lock, the mood
+
+class Desk:
+    """Your desk settings and today's paper trades, kept in trader/state/chart-desk.json. The settings start from
+    trader/config.json (the same limits nse-budget and nse-risk use); what you change on the page is kept here."""
+
+    def __init__(self, store, folder="trader"):
+        self.store, self.folder = store, folder
+        self.path = os.path.join(folder, "state", "chart-desk.json")
+        self.lock = threading.Lock()
+
+    def _load(self):
+        try:
+            with open(self.path, encoding="utf-8") as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            return {"settings": {}, "trades": []}
+
+    def _save(self, doc):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        tmp = self.path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(doc, fh, indent=1)
+        os.replace(tmp, self.path)
+
+    def settings(self, doc):
+        try:
+            with open(os.path.join(self.folder, "config.json"), encoding="utf-8") as fh:
+                cfg = json.load(fh)
+        except (OSError, ValueError):
+            cfg = {}
+        return chart_desk.settings_from(cfg, doc.get("settings"))
+
+    def _today_bars(self, sym):
+        self.store.chart(sym)
+        with self.store.lock:
+            return list(self.store.today.get(sym, []))
+
+    def _state(self, doc):
+        now = self.store.clock.now()
+        s = self.settings(doc)
+        syms = {t["symbol"] for t in doc["trades"] if t["placed"][:10] == now.strftime("%Y-%m-%d")}
+        book = chart_desk.day_book(doc["trades"], {x: self._today_bars(x) for x in syms}, now, s)
+        with self.store.lock:
+            rows = list(self.store.board.get("stocks") or [])
+        md = chart_desk.mood(rows, now, book, market_state(now)[0] == "open")
+        return now, s, book, md
+
+    def view(self, sym=None):
+        with self.lock:
+            doc = self._load()
+        now, s, book, md = self._state(doc)
+        out = {"settings": s, "book": book, "mood": md, "sizes": None}
+        if sym:
+            sym = INDEX if yahoo_symbol(sym) == INDEX_YAHOO else from_yahoo(sym).upper()
+            today = self._today_bars(sym)
+            plan = orb_plan(sym, today, now) if today and today[0][0].date() == now.date() else None
+            if plan and plan.get("status") == "ready" and sym != INDEX:
+                out["sizes"] = {side: chart_desk.size_trade(side, plan[side]["entry"], plan[side]["stop"], plan[side]["targets"],
+                                                            s, book["realized"], md.get("factor", 1.0) or 1.0, book["in_use"]) for side in ("buy", "sell")}
+        return out
+
+    def place(self, data):
+        sym = from_yahoo(str(data.get("sym") or "")).upper()
+        if not sym or sym == INDEX or yahoo_symbol(sym) == INDEX_YAHOO:
+            raise chart_desk.DeskError("Pick a stock: the index cannot be bought or sold in the cash market.")
+        with self.lock:
+            doc = self._load()
+            now, s, book, md = self._state(doc)
+            today = self._today_bars(sym)
+            done = [b for b in today if b[0] + BAR <= now and b[0].date() == now.date()]
+            plan = orb_plan(sym, today, now) if done else None
+            t = chart_desk.new_trade(sym, plan, str(data.get("side")), int(data.get("target") or 1), done[-1] if done else None,
+                                     now, s, book, md, max([x["id"] for x in doc["trades"]] or [0]) + 1)
+            doc["trades"].append(t)
+            self._save(doc)
+        return self.view(sym)
+
+    def exit(self, data):
+        with self.lock:
+            doc = self._load()
+            now = self.store.clock.now()
+            t = next((x for x in doc["trades"] if x["id"] == data.get("id")), None)
+            if not t or t["placed"][:10] != now.strftime("%Y-%m-%d"):
+                raise chart_desk.DeskError("No such trade today.")
+            done = [b for b in self._today_bars(t["symbol"]) if b[0] + BAR <= now]
+            if not done:
+                raise chart_desk.DeskError("No closed bar yet.")
+            t["exit"] = {"price": done[-1][4], "time": (done[-1][0] + BAR).strftime("%H:%M")}
+            self._save(doc)
+        return self.view(t["symbol"])
+
+    def set(self, data):
+        with self.lock:
+            doc = self._load()
+            doc["settings"] = dict(doc.get("settings") or {}, **chart_desk.clean_settings(data))
+            self._save(doc)
+        return self.view(data.get("sym"))
+
+
 def board_loop(store, stop, alerter=None):
     while not stop.is_set():
         try:
@@ -202,7 +304,9 @@ def board_loop(store, stop, alerter=None):
 
 # ---------------------------------------------------------------- the web page
 
-def make_handler(store):
+def make_handler(store, desk=None):
+    desk = desk or Desk(store)
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):
             pass
@@ -231,9 +335,30 @@ def make_handler(store):
                     return self.send(200, json.dumps(store.chart(sym, tf)))
                 if url.path == "/api/backtest":
                     return self.send(200, json.dumps(store.backtest(sym)))
+                if url.path == "/api/desk":
+                    return self.send(200, json.dumps(desk.view((q.get("sym") or [None])[0])))
                 self.send(404, json.dumps({"error": "not found"}))
             except ChartError as e:
                 self.send(502, json.dumps({"error": str(e)}))
+
+        def do_POST(self):
+            """The desk's changes: JSON from this page only (a page on another site cannot send JSON here)."""
+            url = urllib.parse.urlparse(self.path)
+            origin = self.headers.get("Origin")
+            if origin and urllib.parse.urlparse(origin).netloc != self.headers.get("Host"):
+                return self.send(403, json.dumps({"error": "not from this page"}))
+            if "application/json" not in (self.headers.get("Content-Type") or ""):
+                return self.send(400, json.dumps({"error": "JSON only"}))
+            try:
+                data = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 10000)) or b"{}")
+                route = {"/api/desk/trade": desk.place, "/api/desk/exit": desk.exit, "/api/desk/settings": desk.set}.get(url.path)
+                if not route:
+                    return self.send(404, json.dumps({"error": "not found"}))
+                return self.send(200, json.dumps(route(data)))
+            except (chart_desk.DeskError, ValueError) as e:
+                return self.send(400, json.dumps({"error": str(e)}))
+            except ChartError as e:
+                return self.send(502, json.dumps({"error": str(e)}))
     return Handler
 
 

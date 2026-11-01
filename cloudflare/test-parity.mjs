@@ -4,7 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
-import { parseChart, payload, closedBars, backtest, describeBacktest, orbPlan, dateOf, atIst } from './src/core.js';
+import { parseChart, payload, closedBars, backtest, describeBacktest, orbPlan, volumeSurge, dateOf, atIst } from './src/core.js';
 
 const FIXTURE = 'tests/fixtures/nse/nifty50-5m-60d.json.gz';
 const TIMES = ['2026-10-30 09:50', '2026-10-30 12:00', '2026-10-30 16:00'];
@@ -20,7 +20,7 @@ for now in ${JSON.stringify(TIMES)}:
         p = store.chart(sym); bars, _ = store.source.chart(sym, '60d')
         bt = live.backtest(live.closed_bars(bars, clock.now())); bt['lines'] = live.describe_backtest(bt)
         today = store.today[sym]
-        out[now + '|' + sym] = {'bias': p['bias'], 'record': bt, 'plan': live.orb_plan(sym, today, clock.now())}
+        out[now + '|' + sym] = {'bias': p['bias'], 'record': bt, 'plan': live.orb_plan(sym, today, clock.now()), 'surge': live.volume_surge(bars, clock.now())}
 print(json.dumps(out))
 `;
 const want = JSON.parse(execFileSync('python', ['-c', py], { maxBuffer: 1 << 28 }).toString('utf8'));
@@ -33,8 +33,8 @@ for (const t of TIMES) {
     const b = all.filter(x => x[0] < now);
     const p = payload(sym, b, meta, now);
     const bt = backtest(closedBars(b, now)); bt.lines = describeBacktest(bt);
-    const got = { bias: p.bias, record: bt, plan: orbPlan(sym, p.bars.filter(x => dateOf(x[0]) === p.session), now) };
-    for (const k of ['bias', 'record', 'plan']) {
+    const got = { bias: p.bias, record: bt, plan: orbPlan(sym, p.bars.filter(x => dateOf(x[0]) === p.session), now), surge: volumeSurge(b, now) };
+    for (const k of ['bias', 'record', 'plan', 'surge']) {
       n++;
       const a = JSON.stringify(got[k]), w = JSON.stringify(want[t + '|' + sym][k]);
       if (a !== w) { bad++; if (bad <= 5) console.log('DIFF', t, sym, k, '\n  js', a, '\n  py', w); }
