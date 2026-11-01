@@ -145,7 +145,17 @@ a.ibtn { text-decoration: none; }
 .pop .fine { margin: 0; }
 .chartbox { position: relative; flex: 1; min-height: 360px; }
 #chart { position: absolute; inset: 0; }
-.legend { position: absolute; top: 6px; left: 8px; z-index: 3; pointer-events: none; display: grid; gap: 2px; font-size: 0.74rem; max-width: calc(100% - 96px); padding: 4px 8px; border-radius: 6px; background: color-mix(in srgb, var(--panel) 86%, transparent); }
+.legend { position: absolute; top: 4px; left: 6px; z-index: 3; pointer-events: none; display: grid; gap: 2px; font-size: 0.72rem; max-width: calc(100% - 96px); padding: 2px 6px; border-radius: 6px; background: color-mix(in srgb, var(--panel) 70%, transparent); }
+/* today's levels: a bar above the chart, so nothing sits on the candles */
+.lvbar { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--raise); font-size: 0.74rem; min-height: 30px; }
+.lvbar:empty { display: none; }
+.lvbar .side { display: inline-flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+.lvbar .k { color: var(--muted); } .lvbar .v { font-family: var(--f-mono); font-weight: 500; }
+.lvbar .tag { font-weight: 700; font-size: 0.68rem; padding: 1px 6px; border-radius: 4px; color: #fff; }
+.lvbar .st { color: var(--muted); font-size: 0.7rem; }
+/* the watchlist can be hidden: the chart takes the width */
+.app.norail { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "strip" "chart"; }
+.app.norail .rail { display: none; }
 .legend .ln { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
 .legend .ttl { font-weight: 600; color: var(--ink); font-size: 0.82rem; }
 .legend .k { color: var(--muted); }
@@ -170,6 +180,7 @@ a.ibtn { text-decoration: none; }
 }
 @media (max-width: 760px) {
   .app { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 100vh; grid-template-rows: auto auto 60vh 300px; grid-template-areas: "top" "strip" "chart" "rail"; }
+  .app.norail { grid-template-rows: auto auto 75vh; grid-template-areas: "top" "strip" "chart"; }
   .chartbox { min-height: 300px; }
   .symhead .nm { display: none; }
   .legend .ln:nth-child(n+4) { display: none; }
@@ -184,6 +195,10 @@ a.ibtn { text-decoration: none; }
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 19V9M9 19V5M14 19v-7M19 19V8"/></svg>
       NSE Live
     </div>
+    <button type="button" class="ibtn" id="railBtn" aria-pressed="true" title="Show or hide the watchlist">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+      <span>Watchlist</span>
+    </button>
     <span class="vr"></span>
     <div class="symhead"><h1 id="sym"></h1><span class="nm" id="nm"></span></div>
     <div class="last" id="last"></div>
@@ -253,6 +268,7 @@ a.ibtn { text-decoration: none; }
       </details>
       <button type="button" class="chip" data-ind="levels" aria-pressed="true"><i style="background:var(--range)"></i>Day levels</button>
     </div>
+    <div class="lvbar" id="lvbar" aria-live="polite"></div>
     <div class="chartbox">
       <div class="legend" id="legend" aria-live="off"></div>
       <div id="chart"></div>
@@ -489,7 +505,24 @@ function utAlert(p, bar, kind) {
     try { if (window.Notification && Notification.permission === 'granted') new Notification(title, { body }); } catch (e) {}
   }
 }
-// TradingView-style legend: OHLC and each indicator's value at the candle under the mouse (the last candle otherwise)
+// Today's levels in the bar above the chart: BUY and SELL, SL, T1-T3 (✓ when hit), and where each side stands
+function renderLevelsBar() {
+  const bar = document.getElementById('lvbar'), lv = state.levels;
+  if (!state.show.levels || !lv) { bar.innerHTML = ''; return; }
+  if (lv.status === 'forming') { bar.innerHTML = '<span class="k">Today\'s levels come at 9:30 AM, when the 9:15–9:30 range is in.</span>'; return; }
+  if (lv.status === 'refused') { bar.innerHTML = '<span class="k">No levels today: the opening range is under 5 ticks wide.</span>'; return; }
+  bar.innerHTML = [lv.buy, lv.sell].map(x => {
+    const buy = x.side === 'buy', col = buy ? 'var(--up)' : 'var(--down)';
+    let st = x.status === 'trig' ? 'in ' + clock(x.etime) : x.status === 'none' ? 'no entry today' : 'waiting';
+    if (x.exit) st += ' · ' + { stop: 'SL hit', t3: 'T3 hit', flat: 'out' }[x.exit.how] + ' ' + clock(x.exit.m);
+    return '<span class="side"><span class="tag" style="background:' + col + '">' + (buy ? 'BUY' : 'SELL') + '</span>' +
+      '<span class="v" style="color:' + col + '">' + (buy ? '&gt; ' : '&lt; ') + fmt(x.entry) + '</span>' +
+      '<span class="k">SL <span class="v">' + fmt(x.stop) + '</span></span>' +
+      x.targets.map((t, n) => '<span class="k">T' + (n + 1) + ' <span class="v"' + (x.hits.length > n ? ' style="color:' + col + '"' : '') + '>' + fmt(t) + (x.hits.length > n ? ' ✓' : '') + '</span></span>').join('') +
+      '<span class="st">' + st + '</span></span>';
+  }).join('');
+}
+// TradingView-style legend, one line: OHLC and the UT Bot stop at the candle under the mouse (the last candle otherwise)
 function showLegend(time) {
   const p = state.data, box = document.getElementById('legend');
   if (!p) { box.innerHTML = ''; return; }
@@ -498,27 +531,15 @@ function showLegend(time) {
   if (!c && cs.length) c = cs[cs.length - 1];
   if (!c) { box.innerHTML = ''; return; }
   const t = c[0] + IST, v = state.vals, ch = (c[4] - c[1]) / c[1] * 100, dir = c[4] >= c[1] ? 'up' : 'down';
-  let h = '<div class="ln"><span class="ttl">' + esc(p.symbol) + ' · ' + (p.tf || '5m').toUpperCase() + ' · NSE</span><span class="k">' + candleWhen(c[0], p.tf === '1d') + '</span></div>' +
-    '<div class="ln"><span class="k">O <span class="v ' + dir + '">' + fmt(c[1]) + '</span></span><span class="k">H <span class="v ' + dir + '">' + fmt(c[2]) + '</span></span>' +
+  let h = '<div class="ln"><span class="ttl">' + esc(p.symbol) + ' · ' + (p.tf || '5m').toUpperCase() + '</span><span class="k">' + candleWhen(c[0], p.tf === '1d') + '</span>' +
+    '<span class="k">O <span class="v ' + dir + '">' + fmt(c[1]) + '</span></span><span class="k">H <span class="v ' + dir + '">' + fmt(c[2]) + '</span></span>' +
     '<span class="k">L <span class="v ' + dir + '">' + fmt(c[3]) + '</span></span><span class="k">C <span class="v ' + dir + '">' + fmt(c[4]) + '</span></span>' +
-    '<span class="v ' + dir + '">' + signed(ch, 2) + '%</span>' + '</div>';
+    '<span class="v ' + dir + '">' + signed(ch, 2) + '%</span>';
   if (state.ut.on) {
-    const s = v.ut && v.ut.get(t);
-    h += '<div class="ln"><span class="k">UT Bot ' + state.ut.key + ' ' + state.ut.atr + (state.ut.ha ? ' HA' : '') + '</span>' + (s == null ? '<span class="k">–</span>' : '<span class="v" style="color:' + ((v.utSrc && v.utSrc.has(t) ? v.utSrc.get(t) : c[4]) > s ? css('--up') : css('--down')) + '">' + fmt(s) + '</span>') + '</div>';
+    const u = v.ut && v.ut.get(t);
+    if (u != null) h += '<span class="k">UT <span class="v" style="color:' + ((v.utSrc && v.utSrc.has(t) ? v.utSrc.get(t) : c[4]) > u ? css('--up') : css('--down')) + '">' + fmt(u) + '</span></span>';
   }
-  const lv = state.levels;
-  if (state.show.levels && lv && lv.status === 'ready') {
-    for (const x of [lv.buy, lv.sell]) {
-      const buy = x.side === 'buy';
-      let st = x.status === 'trig' ? 'in ' + clock(x.etime) : x.status === 'none' ? 'no entry today' : 'waiting for a 5-min close ' + (buy ? 'above' : 'below');
-      if (x.exit) st += ' · ' + { stop: 'SL hit', t3: 'T3 hit', flat: 'out 15:10' }[x.exit.how] + ' ' + clock(x.exit.m);
-      h += '<div class="ln"><span class="v ' + (buy ? 'up' : 'down') + '">' + (buy ? 'BUY &gt; ' : 'SELL &lt; ') + fmt(x.entry) + '</span>' +
-        '<span class="k">SL <span class="v">' + fmt(x.stop) + '</span></span>' +
-        x.targets.map((t, n) => '<span class="k">T' + (n + 1) + ' <span class="v' + (x.hits.length > n ? ' ' + (buy ? 'up' : 'down') : '') + '">' + fmt(t) + (x.hits.length > n ? ' ✓' : '') + '</span></span>').join('') +
-        '<span class="k">' + st + '</span></div>';
-    }
-  } else if (state.show.levels && lv && lv.status === 'forming') h += '<div class="ln"><span class="k">Levels at 9:30 AM, when the 9:15–9:30 range is in</span></div>';
-  else if (state.show.levels && lv && lv.status === 'refused') h += '<div class="ln"><span class="k">No levels today: the opening range is under 5 ticks wide</span></div>';
+  h += '</div>';
   box.innerHTML = h;
 }
 const toMap = (pts) => new Map(pts.map(x => [x.time, x.value]));
@@ -552,17 +573,16 @@ function renderChart() {
   if (sh.levels && a.status === 'ready' && dc.length) {
     const t915 = dc[0][0], t1 = bucket(cs, t915 + 900) + IST, at = (i) => bucket(cs, p.bars[i][0]) + IST;
     if (t1 > t915 + IST) bx.push({ t1: t915 + IST, t2: t1, hi: a.orH, lo: a.orL, color: css('--range') + '22' });
-    const tick = (x, n) => x.hits.length > n ? ' ✓' : '';
-    ln.push({ t1, t2: null, price: a.orH, color: upc, width: 2, label: 'BUY ' + fmt(a.orH) + ' · sell SL' });
-    ln.push({ t1, t2: null, price: a.orL, color: dnc, width: 2, label: 'SELL ' + fmt(a.orL) + ' · buy SL' });
-    a.buy.targets.forEach((t, n) => ln.push({ t1, t2: null, price: t, color: upc, width: 1, dash: true, label: 'Buy T' + (n + 1) + ' ' + fmt(t) + tick(a.buy, n) }));
-    a.sell.targets.forEach((t, n) => ln.push({ t1, t2: null, price: t, color: dnc, width: 1, dash: true, label: 'Sell T' + (n + 1) + ' ' + fmt(t) + tick(a.sell, n) }));
+    ln.push({ t1, t2: null, price: a.orH, color: upc, width: 2, label: '' });
+    ln.push({ t1, t2: null, price: a.orL, color: dnc, width: 2, label: '' });
+    a.buy.targets.forEach((t, n) => ln.push({ t1, t2: null, price: t, color: upc, width: 1, dash: true, label: '' }));
+    a.sell.targets.forEach((t, n) => ln.push({ t1, t2: null, price: t, color: dnc, width: 1, dash: true, label: '' }));
     for (const x of [a.buy, a.sell]) {
       if (x.status !== 'trig') continue;
       const buy = x.side === 'buy';
-      mk.push({ time: at(x.idx), position: buy ? 'belowBar' : 'aboveBar', color: buy ? upc : dnc, shape: buy ? 'arrowUp' : 'arrowDown', text: (buy ? 'BUY ' : 'SELL ') + clock(x.etime) });
+      mk.push({ time: at(x.idx), position: buy ? 'belowBar' : 'aboveBar', color: buy ? upc : dnc, shape: buy ? 'arrowUp' : 'arrowDown', text: '' });
       if (x.exit) mk.push({ time: at(x.exit.i), position: buy ? 'aboveBar' : 'belowBar', color: x.exit.how === 'stop' ? css('--muted') : buy ? upc : dnc, shape: 'circle',
-        text: x.exit.how === 'stop' ? (x.hits.length ? 'T' + x.hits.length + ', then SL' : 'SL') : x.exit.how === 't3' ? 'T3' : 'Out 15:10' });
+        text: '' });
     }
     // today's levels on the price scale
     const tag = (price, color, title) => lines.push(candles.createPriceLine({ price, color, title, lineVisible: false, axisLabelVisible: true }));
@@ -572,6 +592,7 @@ function renderChart() {
   }
   levelLines.bg = css('--panel') + 'd9';
   levelLines.set(ln, bx);
+  renderLevelsBar();
   // UT Bot on closed candles only: the forming candle's signal can still vanish before it closes
   const note = document.getElementById('utNote');
   if (state.ut.on) {
@@ -798,6 +819,15 @@ document.getElementById('themeBtn').addEventListener('click', () => {
   themeChart();
 });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeChart);
+
+// the watchlist switch, remembered in this browser
+function setRail(on) {
+  document.querySelector('.app').classList.toggle('norail', !on);
+  const b = document.getElementById('railBtn'); b.setAttribute('aria-pressed', on);
+  try { localStorage.setItem('nse-live-rail', on ? '1' : '0'); } catch (e) {}
+}
+document.getElementById('railBtn').addEventListener('click', () => setRail(document.querySelector('.app').classList.contains('norail')));
+{ let r = null; try { r = localStorage.getItem('nse-live-rail'); } catch (e) {} setRail(r !== '0'); }
 
 initChart(); renderList(); select(state.sym); loadStatus();
 setInterval(loadChart, 30000);
