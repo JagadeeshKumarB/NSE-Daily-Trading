@@ -1,0 +1,25 @@
+# NSE Live Chart on Cloudflare Workers: the nse-chart page, its API, and the Nifty 50 list
+# refreshed by a cron every minute (each stock every 5 minutes during the session).
+#   npx wrangler deploy            (from this folder)
+name = "nse-live-chart"
+main = "src/worker.js"
+compatibility_date = "2026-10-01"
+
+# page.html is bundled from nse-chart/ as text: one page for both the local and the hosted chart
+rules = [{ type = "Text", globs = ["**/*.html"], fallthrough = true }]
+
+# Private: reached only through nselive.pages.dev (no workers.dev, no preview addresses). The Worker signs people in itself (src/auth.js):
+# an invited email gets a one-time code by email. Secrets, set with  npx wrangler secret put NAME :
+#   ALLOWED_EMAILS   who may sign in (comma-separated)
+#   SESSION_SECRET   signs the session cookie (48+ random characters)
+#   RESEND_API_KEY   sends the code (resend.com, free); MAIL_FROM optional, default onboarding@resend.dev
+workers_dev = false   # the only address is nselive.pages.dev (cloudflare/pages), which hands requests to this Worker
+preview_urls = false
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nse-live-chart"
+database_id = "5edcaa00-92a2-47a3-aa31-92aa859d4267"
+
+[triggers]
+crons = ["* * * * *"]

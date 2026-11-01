@@ -1,0 +1,44 @@
+{
+  "created_by": "nse-budget",
+  "created_at": "2026-10-30T04:15:00Z",
+  "status": "proposed",
+  "paper": true,
+  "note": "Test orders: MTARTECH and ABAN prices are illustrative, not market data. MTARTECH sits near its 5 % upper circuit; ABAN is a BE-series (trade-for-trade) stock.",
+  "source": "tests/fixtures/nse-risk",
+  "orders": [
+    {
+      "symbol": "MTARTECH",
+      "exchange": "NSE",
+      "tradingsymbol": "MTARTECH",
+      "transaction_type": "BUY",
+      "quantity": 25,
+      "product": "MIS",
+      "order_type": "LIMIT",
+      "price": "2085.00",
+      "variety": "regular",
+      "validity": "DAY",
+      "exits": {
+        "stop_loss": {"transaction_type": "SELL", "order_type": "SL", "trigger_price": "2070.00", "price": "2059.60"},
+        "target": {"transaction_type": "SELL", "order_type": "LIMIT", "price": "2100.00"}
+      },
+      "plan": {"entry": 2085.0, "stop": 2070.0, "target": 2100.0, "setup": "orb", "flat_by": "15:10"}
+    },
+    {
+      "symbol": "ABAN",
+      "exchange": "NSE",
+      "tradingsymbol": "ABAN",
+      "transaction_type": "BUY",
+      "quantity": 1000,
+      "product": "MIS",
+      "order_type": "LIMIT",
+      "price": "34.50",
+      "variety": "regular",
+      "validity": "DAY",
+      "exits": {
+        "stop_loss": {"transaction_type": "SELL", "order_type": "SL", "trigger_price": "34.20", "price": "34.02"},
+        "target": {"transaction_type": "SELL", "order_type": "LIMIT", "price": "34.80"}
+      },
+      "plan": {"entry": 34.5, "stop": 34.2, "target": 34.8, "setup": "orb", "flat_by": "15:10"}
+    }
+  ]
+}

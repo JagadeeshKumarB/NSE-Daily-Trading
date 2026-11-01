@@ -1,0 +1,10 @@
+{
+  "as_of": "2026-10-30T04:20:00Z",
+  "note": "ICICIBANK: the 09:50 bar's open and the Oct 29 close from tests/fixtures/nse/nifty50-5m-60d.json.gz. MTARTECH and ABAN: illustrative, not market data.",
+  "prices": {"ICICIBANK": 1395.0, "MTARTECH": 2085.0, "ABAN": 34.5},
+  "detail": {
+    "ICICIBANK": {"time": "2026-10-30T04:20:00Z", "fetched": "2026-10-30T04:20:00Z", "prev_close": 1386.6},
+    "MTARTECH": {"time": "2026-10-30T04:20:00Z", "fetched": "2026-10-30T04:20:00Z", "prev_close": 2000.0},
+    "ABAN": {"time": "2026-10-30T04:20:00Z", "fetched": "2026-10-30T04:20:00Z", "prev_close": 34.2}
+  }
+}

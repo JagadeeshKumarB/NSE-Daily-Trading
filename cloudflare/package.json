@@ -1,0 +1,5 @@
+{
+  "name": "nse-live-chart",
+  "private": true,
+  "type": "module"
+}

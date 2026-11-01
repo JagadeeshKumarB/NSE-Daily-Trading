@@ -1,0 +1,18 @@
+{
+  "created_by": "nse-entry",
+  "symbol": "ICICIBANK",
+  "setup": "orb",
+  "side": "buy",
+  "date": "2026-10-30",
+  "status": "triggered",
+  "time": "9:35 AM",
+  "bar_start": "09:30",
+  "bar_index": 3,
+  "price": 1394.5,
+  "level": 1390.9,
+  "interval": "5m",
+  "opening_range": {"high": 1390.9, "low": 1383.4, "minutes": 15},
+  "source": "yahoo",
+  "checked_at": "2026-10-30T04:05:00Z",
+  "reason": "the 9:30 bar closed at 1394.50, above the opening-range high 1390.90"
+}

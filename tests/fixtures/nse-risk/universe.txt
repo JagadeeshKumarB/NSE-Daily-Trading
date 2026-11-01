@@ -1,0 +1,8 @@
+ICICIBANK|ICICI Bank Limited|EQ|No Band
+HDFCBANK|HDFC Bank Limited|EQ|No Band
+RELIANCE|Reliance Industries Limited|EQ|No Band
+SBIN|State Bank of India|EQ|No Band
+INFY|Infosys Limited|EQ|No Band
+AAVAS|Aavas Financiers Limited|EQ|20
+MTARTECH|Mtar Technologies Limited|EQ|5
+ABAN|Aban Offshore Limited|BE|2

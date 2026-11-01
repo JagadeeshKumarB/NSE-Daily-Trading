@@ -1,0 +1,41 @@
+{
+  "created_by": "nse-budget",
+  "created_at": "2026-10-30T04:05:00Z",
+  "status": "proposed",
+  "paper": true,
+  "note": "Proposals only. Nothing is placed until nse-risk passes each order and you say yes to it in the chat.",
+  "source": "trader/plan.json (ICICIBANK orb 2026-10-30)",
+  "orders": [
+    {
+      "symbol": "ICICIBANK",
+      "exchange": "NSE",
+      "tradingsymbol": "ICICIBANK",
+      "transaction_type": "BUY",
+      "quantity": 53,
+      "product": "MIS",
+      "order_type": "LIMIT",
+      "price": "1394.50",
+      "variety": "regular",
+      "validity": "DAY",
+      "exits": {
+        "stop_loss": {"transaction_type": "SELL", "order_type": "SL", "trigger_price": "1387.10", "price": "1385.70"},
+        "target": {"transaction_type": "SELL", "order_type": "LIMIT", "price": "1401.90"}
+      },
+      "oco_note": "Zerodha has no bracket order for this: place the stop and the target after the entry fills, and cancel the other one the moment one fills.",
+      "charges_estimate": {"at_stop": 73.32, "at_target": 73.55},
+      "max_loss": 392.2,
+      "max_loss_with_charges": 465.52,
+      "why": "opening-range breakout on ICICIBANK: 53 shares, bound by your ₹75,000 max order (53 x 1394.50 = ₹73,908.50). At the stop: 53 x 7.40 = ₹392.20 + ₹73.32 charges = ₹465.52, inside your ₹500 max loss.",
+      "plan": {
+        "entry": 1394.5,
+        "stop": 1387.1,
+        "target": 1401.9,
+        "risk_per_share": 7.4,
+        "max_loss": 392.2,
+        "setup": "orb",
+        "entry_time": "9:35 AM",
+        "flat_by": "15:10"
+      }
+    }
+  ]
+}

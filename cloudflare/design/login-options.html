@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login Designs · NSE Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Three login screen designs for the private NSE Live chart. Pick one with the switcher at the top;
+   each has two steps: email, then the 6-digit code. A design preview: nothing is sent anywhere. */
+:root {
+  --bg: #0b0e14; --panel: #161a25; --raise: #1e2230; --line: #262b3a; --ink: #e6e8ee; --muted: #8b90a0;
+  --up: #22ab94; --down: #f7525f; --accent: #5b8cff; --gold: #f5a524;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --f-head: "Space Grotesk", "IBM Plex Sans", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); overflow-x: hidden; }
+button, input { font: inherit; color: inherit; }
+
+/* ---- the switcher (not part of any design) ---- */
+.pick { position: fixed; z-index: 50; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;
+  width: max-content; padding: 6px; border-radius: 14px; background: rgba(30, 34, 48, .92); border: 1px solid #333a4d; box-shadow: 0 10px 30px rgba(0,0,0,.5); backdrop-filter: blur(8px); max-width: calc(100vw - 24px); }
+.pick .lbl { font: 600 11px var(--f-mono); color: var(--muted); text-transform: uppercase; letter-spacing: .1em; padding: 0 8px; }
+.pick button { border: 0; background: transparent; color: var(--muted); padding: 6px 9px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pick button[aria-pressed="true"] { background: #fff; color: #0b0e14; }
+.pick .sep { width: 1px; align-self: stretch; background: #333a4d; margin: 0 4px; }
+.note { position: fixed; z-index: 50; bottom: 12px; left: 50%; transform: translateX(-50%); font: 12px var(--f-body); color: var(--muted); background: rgba(30,34,48,.92);
+  border: 1px solid #333a4d; padding: 7px 12px; border-radius: 10px; text-align: center; max-width: calc(100vw - 24px); }
+.design { display: none; min-height: 100vh; position: relative; }
+.design.on { display: block; }
+.step2 { display: none; } .design.code .step1 { display: none; } .design.code .step2 { display: block; }
+
+/* shared form bits */
+.otp { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.otp input { width: 100%; aspect-ratio: 1 / 1.15; text-align: center; font: 600 1.35rem var(--f-mono); border-radius: 10px; outline: none; }
+.field { display: grid; gap: 7px; }
+.field label { font-size: .78rem; font-weight: 600; letter-spacing: .02em; }
+.field input { width: 100%; padding: 13px 14px; border-radius: 11px; outline: none; font-size: .95rem; }
+.back { background: none; border: 0; padding: 0; cursor: pointer; font-size: .8rem; text-decoration: underline; text-underline-offset: 3px; }
+canvas.bgc { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* ================================================================ A. Glass over a live tape */
+#A { background: #0b0e14; overflow: hidden; height: 100vh; }
+#A .shade { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 55% 60% at 50% 52%, rgba(11,14,20,.86) 0%, rgba(11,14,20,.5) 55%, rgba(11,14,20,.12) 100%); }
+#A .wrap { position: relative; z-index: 2; height: 100%; display: grid; place-items: center; padding: 72px 16px 56px; }
+#A .card { width: 100%; max-width: 410px; background: rgba(22,26,37,.74); border: 1px solid rgba(255,255,255,.08); border-radius: 22px; padding: 32px 28px 24px;
+  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); box-shadow: 0 30px 90px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06); }
+#A .brand { display: flex; align-items: center; gap: 12px; }
+#A .brand .t { font: 700 1.05rem var(--f-head); } #A .brand .s { color: var(--muted); font-size: .78rem; }
+#A h1 { font: 700 1.65rem/1.15 var(--f-head); margin: 26px 0 8px; letter-spacing: -.02em; }
+#A h1 em { font-style: normal; background: linear-gradient(90deg, var(--up), var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+#A p.sub { color: var(--muted); margin: 0 0 22px; font-size: .9rem; line-height: 1.55; }
+#A .field label { color: #b7bccb; }
+#A .field input, #A .otp input { background: rgba(11,14,20,.6); border: 1px solid #2c3244; }
+#A .field input:focus, #A .otp input:focus { border-color: var(--up); box-shadow: 0 0 0 3px rgba(34,171,148,.18); }
+#A .go { margin-top: 16px; width: 100%; padding: 13px; border: 0; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: .98rem; color: #06120f;
+  background: linear-gradient(180deg, #2bc0a6, #1d9a84); box-shadow: 0 10px 26px rgba(34,171,148,.35), inset 0 1px 0 rgba(255,255,255,.25); }
+#A .meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; color: var(--muted); font-size: .76rem; }
+#A .back { color: var(--muted); }
+#A .foot { margin-top: 20px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.07); font-size: .7rem; color: #5f6474; text-align: center; line-height: 1.5; }
+#A .ticker { position: absolute; z-index: 3; top: 0; left: 0; right: 0; overflow: hidden; white-space: nowrap; font: 500 12px var(--f-mono); color: var(--muted);
+  border-bottom: 1px solid rgba(255,255,255,.06); background: rgba(11,14,20,.6); backdrop-filter: blur(6px); padding: 10px 0; }
+
+/* ================================================================ B. Split: annotated chart + form */
+#B { display: none; grid-template-columns: minmax(0, 1.25fr) minmax(360px, .75fr); min-height: 100vh; background: #0b0e14; }
+#B.on { display: grid; }
+#B .chart { position: relative; overflow: hidden; border-right: 1px solid var(--line); background: linear-gradient(180deg, #0e121b, #0b0e14); min-height: 100vh; }
+#B .chart .hud { position: absolute; z-index: 2; left: 28px; top: 28px; right: 28px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+#B .sym { font: 700 1.5rem var(--f-head); } #B .sym small { display: block; font: 500 .78rem var(--f-mono); color: var(--muted); margin-top: 2px; }
+#B .px { font: 600 1.6rem var(--f-mono); color: var(--up); text-align: right; } #B .px small { display: block; font-size: .8rem; }
+#B .legend { position: absolute; z-index: 2; left: 28px; bottom: 28px; display: flex; gap: 14px; flex-wrap: wrap; font: 500 .74rem var(--f-mono); color: var(--muted); }
+#B .legend i { display: inline-block; width: 14px; height: 2px; vertical-align: middle; margin-right: 6px; }
+#B .form { display: grid; place-items: center; padding: 72px 40px 56px; background: #10131b; }
+#B .inner { width: 100%; max-width: 360px; }
+#B .logo { display: flex; align-items: center; gap: 10px; font: 700 1rem var(--f-head); }
+#B h1 { font: 700 2rem/1.1 var(--f-head); margin: 34px 0 10px; letter-spacing: -.03em; }
+#B p.sub { color: var(--muted); margin: 0 0 28px; font-size: .92rem; line-height: 1.55; }
+#B .field label { color: var(--muted); text-transform: uppercase; font-size: .7rem; letter-spacing: .1em; }
+#B .field input, #B .otp input { background: #161a25; border: 1px solid var(--line); }
+#B .field input:focus, #B .otp input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91,140,255,.2); }
+#B .go { margin-top: 18px; width: 100%; padding: 14px; border: 0; border-radius: 11px; cursor: pointer; font-weight: 700; color: #fff;
+  background: linear-gradient(90deg, #22ab94, #2a8cff); box-shadow: 0 10px 30px rgba(42,140,255,.25); }
+#B .meta { margin-top: 16px; color: var(--muted); font-size: .78rem; display: flex; justify-content: space-between; gap: 10px; }
+#B .back { color: var(--muted); }
+#B .trust { margin-top: 34px; display: grid; gap: 10px; }
+#B .trust div { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: .8rem; }
+#B .trust b { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: #161a25; border: 1px solid var(--line); font-size: .8rem; }
+@media (max-width: 860px) {
+  #B.on { grid-template-columns: minmax(0, 1fr); }
+  #B .chart { min-height: 42vh; height: 42vh; border-right: 0; border-bottom: 1px solid var(--line); }
+  #B .chart .hud { top: 68px; left: 16px; right: 16px; } #B .legend { left: 16px; bottom: 12px; }
+  #B .form { padding: 28px 16px 72px; }
+  #B h1 { font-size: 1.6rem; margin-top: 22px; }
+}
+
+/* ================================================================ shared by B2-B5 */
+.design.split.on { display: grid; }
+.sp-chart { position: relative; overflow: hidden; min-height: 100vh; background: linear-gradient(180deg, #0e121b, #0b0e14); }
+.sp-hud { position: absolute; z-index: 2; left: 28px; top: 28px; right: 28px; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.sp-hud .sym { font: 700 1.5rem var(--f-head); } .sp-hud .sym small { display: block; font: 500 .78rem var(--f-mono); color: var(--muted); margin-top: 2px; }
+.sp-hud .px { font: 600 1.6rem var(--f-mono); text-align: right; } .sp-hud .px small { display: block; font-size: .8rem; }
+.sp-form { display: grid; place-items: center; padding: 72px 40px 56px; }
+.sp-inner { width: 100%; max-width: 370px; }
+.sp-logo { display: flex; align-items: center; gap: 10px; font: 700 1rem var(--f-head); }
+.sp-inner h1 { font: 700 2rem/1.1 var(--f-head); margin: 30px 0 10px; letter-spacing: -.03em; }
+.sp-inner p.sub { margin: 0 0 26px; font-size: .92rem; line-height: 1.55; }
+.sp-inner .meta { margin-top: 16px; font-size: .78rem; display: flex; justify-content: space-between; gap: 10px; }
+.sp-inner .go { margin-top: 18px; width: 100%; padding: 14px; border: 0; border-radius: 11px; cursor: pointer; font-weight: 700; font-size: .98rem; }
+.lv { display: grid; gap: 1px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--line); font-family: var(--f-mono); }
+.lv div { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 12px; background: #131722; font-size: .82rem; }
+.lv div span { color: var(--muted); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; }
+.lv .ok { color: var(--up); font-size: .7rem; margin-left: 6px; }
+@media (max-width: 860px) {
+  .design.split.on { grid-template-columns: minmax(0, 1fr) !important; }
+  .sp-chart { min-height: 42vh; height: 42vh; order: -1; }
+  .sp-hud { top: 68px; left: 16px; right: 16px; }
+  .sp-form { padding: 28px 16px 72px; }
+  .sp-inner h1 { font-size: 1.6rem; margin-top: 22px; }
+}
+
+/* ---- B2 Mirror: form left, chart right with a levels card ---- */
+#B2 { grid-template-columns: minmax(380px, .7fr) minmax(0, 1.3fr); background: #0b0e14; }
+#B2 .sp-form { background: #0f1219; border-right: 1px solid var(--line); }
+#B2 .sp-inner p.sub, #B2 .meta, #B2 .back { color: var(--muted); }
+#B2 .field label { color: #b7bccb; }
+#B2 .field input, #B2 .otp input { background: #161a25; border: 1px solid var(--line); }
+#B2 .field input:focus, #B2 .otp input:focus { border-color: var(--up); box-shadow: 0 0 0 3px rgba(34,171,148,.18); }
+#B2 .go { background: var(--up); color: #06120f; box-shadow: 0 10px 28px rgba(34,171,148,.3); }
+#B2 .go:hover { background: #2bc0a6; }
+#B2 .hello { display: inline-flex; gap: 8px; align-items: center; margin-top: 30px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); font: 500 .72rem var(--f-mono); color: var(--muted); }
+#B2 .hello i { width: 7px; height: 7px; border-radius: 50%; background: var(--up); box-shadow: 0 0 0 3px rgba(34,171,148,.2); }
+#B2 .sp-inner h1 { margin-top: 14px; }
+#B2 .lvbox { position: absolute; z-index: 2; right: 28px; bottom: 76px; width: 270px; background: rgba(19,23,34,.88); border: 1px solid var(--line); border-radius: 14px; padding: 12px; backdrop-filter: blur(8px); }
+#B2 .lvbox h4 { margin: 2px 4px 10px; font: 600 .72rem var(--f-mono); color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+@media (max-width: 860px) { #B2 .lvbox { display: none; } }
+
+/* ---- B3 Light desk: dark chart, bright paper-white form ---- */
+#B3 { grid-template-columns: minmax(0, 1.2fr) minmax(380px, .8fr); background: #f6f7f9; }
+#B3 .sp-form { background: #f6f7f9; color: #161a22; }
+#B3 .sp-logo { color: #161a22; }
+#B3 .sp-inner p.sub, #B3 .meta, #B3 .back { color: #5d6372; }
+#B3 .field label { color: #2a2f3a; }
+#B3 .field input, #B3 .otp input { background: #fff; border: 1px solid #d5d9e1; color: #161a22; }
+#B3 .field input::placeholder { color: #9aa0ad; }
+#B3 .field input:focus, #B3 .otp input:focus { border-color: #12a37f; box-shadow: 0 0 0 3px rgba(18,163,127,.16); }
+#B3 .go { background: #12a37f; color: #fff; box-shadow: 0 8px 20px rgba(18,163,127,.28); }
+#B3 .go:hover { background: #0f8e6e; }
+#B3 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 28px; }
+#B3 .chips span { font: 500 .74rem var(--f-mono); padding: 5px 9px; border-radius: 7px; background: #fff; border: 1px solid #e1e4ea; color: #4b5160; }
+#B3 .chips b { color: #12a37f; } #B3 .chips b.r { color: #e0414e; }
+#B3 .quote { position: absolute; z-index: 2; left: 28px; bottom: 76px; right: 28px; font: 600 1.35rem/1.3 var(--f-head); color: #e6e8ee; max-width: 520px; }
+#B3 .quote small { display: block; margin-top: 8px; font: 500 .78rem var(--f-mono); color: var(--muted); }
+@media (max-width: 860px) { #B3 .quote { display: none; } }
+
+/* ---- B4 Levels ticket: today's plan as a ticket above the form ---- */
+#B4 { grid-template-columns: minmax(0, 1.25fr) minmax(400px, .75fr); background: #0b0e14; }
+#B4 .sp-form { background: radial-gradient(600px 400px at 100% 0%, rgba(91,140,255,.10), transparent 60%), #10131b; border-left: 1px solid var(--line); }
+#B4 .sp-inner p.sub, #B4 .meta, #B4 .back { color: var(--muted); }
+#B4 .sp-inner h1 { font-size: 1.7rem; margin-top: 24px; }
+#B4 .field label { color: #b7bccb; }
+#B4 .field input, #B4 .otp input { background: #161a25; border: 1px solid var(--line); }
+#B4 .field input:focus, #B4 .otp input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91,140,255,.2); }
+#B4 .go { background: linear-gradient(90deg, #22ab94, #2a8cff); color: #fff; box-shadow: 0 10px 30px rgba(42,140,255,.25); }
+#B4 .ticket { margin-top: 24px; border: 1px dashed #343b4f; border-radius: 14px; padding: 14px; background: rgba(22,26,37,.6); }
+#B4 .ticket .hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font: 600 .74rem var(--f-mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+#B4 .ticket .hd b { color: var(--gold); }
+#B4 .tk { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#B4 .tk div { border-radius: 10px; padding: 9px 10px; background: #131722; border: 1px solid var(--line); font-family: var(--f-mono); }
+#B4 .tk small { display: block; font-size: .66rem; color: var(--muted); letter-spacing: .08em; }
+#B4 .tk b { font-size: .95rem; }
+#B4 .tk .wide { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 6px; }
+#B4 .tk .wide span { font-size: .78rem; } #B4 .tk .wide em { font-style: normal; color: var(--muted); font-size: .66rem; margin-right: 4px; }
+
+/* ---- B5 Floating: full chart with the form docked on the right ---- */
+#B5 { background: #0b0e14; overflow: hidden; height: 100vh; }
+#B5 .sp-chart { position: absolute; inset: 0; min-height: 0; }
+#B5 .sp-hud { right: 470px; }
+#B5 .dock { position: absolute; z-index: 3; top: 24px; right: 24px; bottom: 76px; width: 420px; display: grid; align-content: center; padding: 34px 32px;
+  background: rgba(16,19,27,.86); border: 1px solid rgba(255,255,255,.08); border-radius: 22px; backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); box-shadow: -20px 0 80px rgba(0,0,0,.5); }
+#B5 .sp-inner p.sub, #B5 .meta, #B5 .back { color: var(--muted); }
+#B5 .field label { color: #b7bccb; }
+#B5 .field input, #B5 .otp input { background: rgba(11,14,20,.7); border: 1px solid #2c3244; }
+#B5 .field input:focus, #B5 .otp input:focus { border-color: var(--up); box-shadow: 0 0 0 3px rgba(34,171,148,.18); }
+#B5 .go { background: linear-gradient(180deg, #2bc0a6, #1d9a84); color: #06120f; box-shadow: 0 10px 26px rgba(34,171,148,.35), inset 0 1px 0 rgba(255,255,255,.25); }
+#B5 .stats { position: absolute; z-index: 2; left: 24px; bottom: 76px; right: 470px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+#B5 .stats div { background: rgba(19,23,34,.82); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-family: var(--f-mono); backdrop-filter: blur(6px); }
+#B5 .stats small { display: block; color: var(--muted); font-size: .66rem; letter-spacing: .08em; } #B5 .stats b { font-size: .98rem; }
+@media (max-width: 1000px) { #B5 .stats { display: none; } }
+@media (max-width: 860px) {
+  #B5 { height: auto; min-height: 100vh; }
+  #B5 .sp-chart { position: relative; height: 42vh; }
+  #B5 .sp-hud { right: 16px; }
+  #B5 .dock { position: relative; top: auto; right: auto; bottom: auto; width: auto; margin: -40px 12px 72px; padding: 26px 18px; }
+}
+
+/* ================================================================ C. Market terminal: heatmap wall + console */
+#C { background: #07090d; overflow: hidden; min-height: 100vh; font-family: var(--f-mono); }
+#C .wall { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); grid-auto-rows: 74px; gap: 3px; padding: 3px; opacity: .55; }
+#C .tile { border-radius: 4px; padding: 8px 9px; display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; color: rgba(255,255,255,.9); transition: background .8s; }
+#C .tile b { font-weight: 600; font-size: 11.5px; letter-spacing: .02em; } #C .tile span { font-size: 13px; font-weight: 600; }
+#C .vign { position: absolute; inset: 0; background: radial-gradient(ellipse 50% 55% at 50% 50%, rgba(7,9,13,.92) 0%, rgba(7,9,13,.7) 50%, rgba(7,9,13,.35) 100%); }
+#C .wrap { position: relative; z-index: 2; min-height: 100vh; display: grid; place-items: center; padding: 76px 16px 60px; }
+#C .term { width: 100%; max-width: 460px; background: #0d1017; border: 1px solid #2a2f3d; border-radius: 12px; overflow: hidden; box-shadow: 0 30px 90px rgba(0,0,0,.7), 0 0 0 1px rgba(245,165,36,.06); }
+#C .bar { display: flex; align-items: center; gap: 7px; padding: 10px 14px; background: #131722; border-bottom: 1px solid #2a2f3d; font-size: 11px; color: var(--muted); }
+#C .bar i { width: 10px; height: 10px; border-radius: 50%; } #C .bar .ttl { margin-left: 8px; letter-spacing: .08em; }
+#C .bar .live { margin-left: auto; color: var(--up); } #C .bar .live::before { content: "●"; margin-right: 5px; animation: blink 1.4s infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+#C .body { padding: 22px 22px 18px; }
+#C .ascii { color: var(--gold); font-size: 11px; line-height: 1.25; margin: 0 0 14px; white-space: pre; overflow: hidden; }
+#C .line { color: var(--muted); font-size: 12.5px; margin: 0 0 4px; } #C .line b { color: var(--up); font-weight: 600; } #C .line .a { color: var(--gold); }
+#C .field { margin-top: 18px; } #C .field label { color: var(--gold); font-size: 12px; letter-spacing: .06em; }
+#C .field label::before { content: "> "; color: var(--up); }
+#C .field input, #C .otp input { background: #07090d; border: 1px solid #2a2f3d; font-family: var(--f-mono); border-radius: 6px; }
+#C .field input:focus, #C .otp input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(245,165,36,.15); }
+#C .go { margin-top: 16px; width: 100%; padding: 12px; border: 1px solid var(--gold); border-radius: 6px; cursor: pointer; font: 700 13px var(--f-mono); letter-spacing: .12em;
+  background: var(--gold); color: #120c00; text-transform: uppercase; }
+#C .go:hover { background: #ffb840; }
+#C .meta { margin-top: 14px; color: #5f6474; font-size: 11px; display: flex; justify-content: space-between; gap: 10px; }
+#C .back { color: #5f6474; font-family: var(--f-mono); font-size: 11px; }
+#C .strip { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #2a2f3d; font-size: 11px; }
+#C .strip div { padding: 10px 12px; border-right: 1px solid #2a2f3d; color: var(--muted); } #C .strip div:last-child { border-right: 0; }
+#C .strip b { display: block; font-size: 13px; margin-top: 2px; }
+@media (max-width: 480px) { #C .ascii { display: none; } #C .body { padding: 18px 16px 16px; } #C .wall { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { #C .bar .live::before { animation: none; } }
+</style>
+</head>
+<body>
+
+<div class="pick" role="group" aria-label="Choose a design">
+  <span class="lbl" title="Preview only: candles, quotes and levels are illustrations">Split</span>
+  <button type="button" data-d="B" aria-pressed="true">B1 · Classic</button>
+  <button type="button" data-d="B2" aria-pressed="false">B2 · Mirror</button>
+  <button type="button" data-d="B3" aria-pressed="false">B3 · Light desk</button>
+  <button type="button" data-d="B4" aria-pressed="false">B4 · Levels ticket</button>
+  <button type="button" data-d="B5" aria-pressed="false">B5 · Floating</button>
+  <span class="sep"></span>
+  <button type="button" data-d="A" aria-pressed="false">A</button>
+  <button type="button" data-d="C" aria-pressed="false">C</button>
+  <span class="sep"></span>
+  <button type="button" data-s="email" aria-pressed="true">1 · Email</button>
+  <button type="button" data-s="code" aria-pressed="false">2 · Code</button>
+</div>
+
+
+<!-- ============================================================ A -->
+<section class="design" id="A">
+  <canvas class="bgc" id="cvA" aria-hidden="true"></canvas>
+  <div class="shade" aria-hidden="true"></div>
+  <div class="ticker" aria-hidden="true"><div class="tape" id="tapeA" style="display:inline-flex;gap:28px;padding-left:16px"></div></div>
+  <div class="wrap">
+    <div class="card">
+      <div class="brand"><span class="logo-slot"></span><div><div class="t">NSE Live</div><div class="s">Private trading desk</div></div></div>
+      <div class="step1">
+        <h1>Your levels, <em>before the move.</em></h1>
+        <p class="sub">Entry, stop-loss and three targets for every Nifty 50 stock, live from 9:30 AM.</p>
+        <div class="field"><label for="eA">Invited email</label><input id="eA" type="email" placeholder="you@gmail.com" autocomplete="email"></div>
+        <button class="go" type="button" data-next>Send my login code</button>
+        <div class="meta"><span>🔒 Invite-only</span><span>Code valid 10 min</span></div>
+      </div>
+      <div class="step2">
+        <h1>Check your <em>inbox.</em></h1>
+        <p class="sub">We sent a 6-digit code to <b class="mail">you@gmail.com</b>. Enter it to open the desk.</p>
+        <div class="otp"></div>
+        <button class="go" type="button">Open the desk</button>
+        <div class="meta"><button class="back" type="button" data-prev>Use another email</button><span>Resend in 0:45</span></div>
+      </div>
+      <div class="foot">Paper first. Education and tooling, not financial advice.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ B -->
+<section class="design split on" id="B">
+  <div class="chart">
+    <canvas class="bgc" id="cvB" aria-hidden="true"></canvas>
+    <div class="hud">
+      <div class="sym">ICICIBANK <small>NSE · 5m · today</small></div>
+      <div class="px" id="pxB">1,399.30 <small>+12.70 (+0.92%)</small></div>
+    </div>
+    <div class="legend"><span><i style="background:var(--up)"></i>BUY / targets</span><span><i style="background:var(--down)"></i>SELL / SL</span><span><i style="background:var(--gold)"></i>Opening range</span></div>
+  </div>
+  <div class="form">
+    <div class="inner">
+      <div class="logo"><span class="logo-slot"></span>NSE Live</div>
+      <div class="step1">
+        <h1>Sign in to your trading desk</h1>
+        <p class="sub">Your private chart: today's BUY and SELL levels, stop-loss and T1–T3 for the Nifty 50.</p>
+        <div class="field"><label for="eB">Email</label><input id="eB" type="email" placeholder="you@gmail.com" autocomplete="email"></div>
+        <button class="go" type="button" data-next>Continue with email code →</button>
+        <div class="meta"><span>One-time code, no password</span><span>Invite-only</span></div>
+      </div>
+      <div class="step2">
+        <h1>Enter your code</h1>
+        <p class="sub">Sent to <b class="mail">you@gmail.com</b>. It works once and expires in 10 minutes.</p>
+        <div class="otp"></div>
+        <button class="go" type="button">Verify and open chart</button>
+        <div class="meta"><button class="back" type="button" data-prev>← Change email</button><span>Resend in 0:45</span></div>
+      </div>
+      <div class="trust">
+        <div><b>🔒</b>Only invited emails can sign in</div>
+        <div><b>⏱</b>Signed in for 24 hours, sign out any time</div>
+        <div><b>📄</b>Paper first. Not financial advice.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ B2 -->
+<section class="design split" id="B2">
+  <div class="sp-form">
+    <div class="sp-inner">
+      <div class="sp-logo"><span class="logo-slot"></span>NSE Live</div>
+      <div class="hello"><i></i>Market open · levels set 09:30</div>
+      <div class="step1">
+        <h1>Welcome back, trader.</h1><p class="sub">Sign in to see today's entry, stop-loss and three targets for every Nifty 50 stock.</p>
+        <div class="field"><label for="eB2">Email</label><input id="eB2" type="email" placeholder="you@gmail.com" autocomplete="email"></div>
+        <button class="go" type="button" data-next>Send login code</button>
+        <div class="meta"><span>🔒 Invite-only</span><span>No password</span></div>
+      </div>
+      <div class="step2">
+        <h1>Enter your code</h1><p class="sub">Sent to <b class="mail">you@gmail.com</b>. Works once, expires in 10 minutes.</p>
+        <div class="otp"></div>
+        <button class="go" type="button">Open my desk</button>
+        <div class="meta"><button class="back" type="button" data-prev>← Change email</button><span>Resend in 0:45</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="sp-chart">
+    <canvas class="bgc" id="cvB2" aria-hidden="true"></canvas>
+    <div class="sp-hud"><div class="sym">HDFCBANK <small>NSE · 5m · today</small></div><div class="px" id="pxB2"></div></div>
+    <div class="lvbox"><h4>Today's plan · HDFCBANK</h4><div class="lv">
+          <div><span>Buy above</span><b style="color:var(--up)">1,390.90</b></div>
+          <div><span>Stop-loss</span><b style="color:var(--down)">1,383.40</b></div>
+          <div><span>T1</span><b style="color:var(--up)">1,398.40<i class="ok">✓ 11:10</i></b></div>
+          <div><span>T2</span><b>1,405.90</b></div>
+          <div><span>T3</span><b>1,413.40</b></div>
+        </div></div>
+  </div>
+</section>
+
+<!-- ============================================================ B3 -->
+<section class="design split" id="B3">
+  <div class="sp-chart">
+    <canvas class="bgc" id="cvB3" aria-hidden="true"></canvas>
+    <div class="sp-hud"><div class="sym">RELIANCE <small>NSE · 5m · today</small></div><div class="px" id="pxB3"></div></div>
+    <div class="quote">Trade the plan, not the noise.<small>Levels at 9:30 · stop-loss first · out by 15:10</small></div>
+  </div>
+  <div class="sp-form">
+    <div class="sp-inner">
+      <div class="sp-logo"><span class="logo-slot"></span>NSE Live</div>
+      <div class="step1">
+        <h1>Log in to your desk</h1><p class="sub">Private intraday levels for the Nifty 50. Invite-only.</p>
+        <div class="field"><label for="eB3">Email address</label><input id="eB3" type="email" placeholder="you@gmail.com" autocomplete="email"></div>
+        <button class="go" type="button" data-next>Get login code</button>
+        <div class="meta"><span>One-time code</span><span>Signed in 24 h</span></div>
+      </div>
+      <div class="step2">
+        <h1>Check your inbox</h1><p class="sub">We emailed a 6-digit code to <b class="mail">you@gmail.com</b>.</p>
+        <div class="otp"></div>
+        <button class="go" type="button">Verify and continue</button>
+        <div class="meta"><button class="back" type="button" data-prev>← Change email</button><span>Resend in 0:45</span></div>
+      </div>
+      <div class="chips"><span>NIFTY <b>▲ 0.84%</b></span><span>Buy triggered <b>24</b></span><span>Sell triggered <b class="r">11</b></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ B4 -->
+<section class="design split" id="B4">
+  <div class="sp-chart">
+    <canvas class="bgc" id="cvB4" aria-hidden="true"></canvas>
+    <div class="sp-hud"><div class="sym">NIFTY 50 <small>NSE · 5m · today</small></div><div class="px" id="pxB4"></div></div>
+  </div>
+  <div class="sp-form">
+    <div class="sp-inner">
+      <div class="sp-logo"><span class="logo-slot"></span>NSE Live</div>
+      <div class="ticket">
+        <div class="hd">Today's ticket · NIFTY 50 <b>09:30</b></div>
+        <div class="tk">
+          <div><small>BUY ABOVE</small><b style="color:var(--up)" id="tkBuy">–</b></div>
+          <div><small>SELL BELOW</small><b style="color:var(--down)" id="tkSell">–</b></div>
+          <div class="wide"><span><em>T1</em><b style="color:var(--up)" id="tkT1">–</b></span><span><em>T2</em><span id="tkT2">–</span></span><span><em>T3</em><span id="tkT3">–</span></span></div>
+        </div>
+      </div>
+      <div class="step1">
+        <h1>Sign in to unlock all 50</h1><p class="sub">The same levels for every Nifty 50 stock, live on a 5-minute chart.</p>
+        <div class="field"><label for="eB4">Email</label><input id="eB4" type="email" placeholder="you@gmail.com" autocomplete="email"></div>
+        <button class="go" type="button" data-next>Continue with email code →</button>
+        <div class="meta"><span>🔒 Invite-only</span><span>Paper first</span></div>
+      </div>
+      <div class="step2">
+        <h1>Enter your code</h1><p class="sub">Sent to <b class="mail">you@gmail.com</b>. Expires in 10 minutes.</p>
+        <div class="otp"></div>
+        <button class="go" type="button">Unlock the desk</button>
+        <div class="meta"><button class="back" type="button" data-prev>← Change email</button><span>Resend in 0:45</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ B5 -->
+<section class="design" id="B5">
+  <div class="sp-chart">
+    <canvas class="bgc" id="cvB5" aria-hidden="true"></canvas>
+    <div class="sp-hud"><div class="sym">ICICIBANK <small>NSE · 5m · today</small></div><div class="px" id="pxB5"></div></div>
+  </div>
+  <div class="stats" aria-hidden="true">
+    <div><small>NIFTY 50</small><b style="color:var(--up)">▲ 0.84%</b></div>
+    <div><small>ADVANCES</small><b style="color:var(--up)">34</b></div>
+    <div><small>DECLINES</small><b style="color:var(--down)">16</b></div>
+    <div><small>BUY / SELL</small><b>24 / 11</b></div>
+  </div>
+  <div class="dock">
+    <div class="sp-inner">
+      <div class="sp-logo"><span class="logo-slot"></span>NSE Live</div>
+      <div class="step1">
+        <h1>Your desk is one code away.</h1><p class="sub">Enter the invited email. We send a one-time code: no password to remember.</p>
+        <div class="field"><label for="eB5">Invited email</label><input id="eB5" type="email" placeholder="you@gmail.com" autocomplete="email"></div>
+        <button class="go" type="button" data-next>Send my code</button>
+        <div class="meta"><span>🔒 Invite-only</span><span>Not financial advice</span></div>
+      </div>
+      <div class="step2">
+        <h1>Enter the 6 digits</h1><p class="sub">Sent to <b class="mail">you@gmail.com</b>. It works once.</p>
+        <div class="otp"></div>
+        <button class="go" type="button">Open the desk</button>
+        <div class="meta"><button class="back" type="button" data-prev>← Change email</button><span>Resend in 0:45</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ C -->
+<section class="design" id="C">
+  <div class="wall" id="wallC" aria-hidden="true"></div>
+  <div class="vign" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="term">
+      <div class="bar"><i style="background:#f7525f"></i><i style="background:#f5a524"></i><i style="background:#22ab94"></i><span class="ttl">NSE-LIVE://DESK</span><span class="live">NSE OPEN</span></div>
+      <div class="body">
+<pre class="ascii" aria-hidden="true">  ▌▐ █▌ ▐█  ▐▌█ ▐█▌█  NSE LIVE
+ ▐█▌█▐█▌█▐ █▌██▐███▌  private trading desk</pre>
+        <p class="line">session <b>09:15–15:30 IST</b> · levels set <span class="a">09:30</span></p>
+        <p class="line">access <b>invite-only</b> · auth <span class="a">email one-time code</span></p>
+        <div class="step1">
+          <div class="field"><label for="eC">ENTER EMAIL</label><input id="eC" type="email" placeholder="you@gmail.com" autocomplete="email"></div>
+          <button class="go" type="button" data-next>Request code</button>
+          <div class="meta"><span>[ESC] nothing stored here</span><span>v1 · paper first</span></div>
+        </div>
+        <div class="step2">
+          <div class="field"><label>ENTER 6-DIGIT CODE · sent to <span class="mail">you@gmail.com</span></label><div class="otp"></div></div>
+          <button class="go" type="button">Authenticate</button>
+          <div class="meta"><button class="back" type="button" data-prev>&lt; other email</button><span>resend 00:45</span></div>
+        </div>
+      </div>
+      <div class="strip">
+        <div>NIFTY 50<b style="color:var(--up)">▲ 0.84%</b></div>
+        <div>ADVANCES<b style="color:var(--up)">34</b></div>
+        <div>DECLINES<b style="color:var(--down)">16</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+const LOGO = '<svg width="40" height="40" viewBox="0 0 96 96" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#161a25"/><rect x="1" y="1" width="94" height="94" rx="21" fill="none" stroke="#2c3244" stroke-width="2"/><path d="M14 70 L32 56 L46 62 L62 38 L82 26" fill="none" stroke="#5b8cff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/><g stroke-linecap="round" stroke-width="3"><line x1="26" y1="44" x2="26" y2="78" stroke="#f7525f"/><line x1="48" y1="36" x2="48" y2="74" stroke="#22ab94"/><line x1="70" y1="18" x2="70" y2="60" stroke="#22ab94"/></g><rect x="20" y="50" width="12" height="20" rx="2.5" fill="#f7525f"/><rect x="42" y="44" width="12" height="22" rx="2.5" fill="#22ab94"/><rect x="64" y="26" width="12" height="26" rx="2.5" fill="#22ab94"/></svg>';
+document.querySelectorAll('.logo-slot').forEach(s => s.innerHTML = LOGO);
+document.querySelectorAll('.otp').forEach(o => {
+  o.innerHTML = Array.from({ length: 6 }, (_, i) => '<input inputmode="numeric" maxlength="1" aria-label="Digit ' + (i + 1) + '">').join('');
+  const ins = [...o.children];
+  ins.forEach((x, i) => x.addEventListener('input', () => { x.value = x.value.replace(/\D/g, ''); if (x.value && ins[i + 1]) ins[i + 1].focus(); }));
+});
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const C = { up: '#22ab94', down: '#f7525f', gold: '#f5a524' };
+
+// ---- the switcher ----
+const state = { d: 'B', s: 'email' };
+function show() {
+  document.querySelectorAll('.design').forEach(x => { x.classList.toggle('on', x.id === state.d); x.classList.toggle('code', state.s === 'code'); });
+  document.querySelectorAll('.pick [data-d]').forEach(b => b.setAttribute('aria-pressed', b.dataset.d === state.d));
+  document.querySelectorAll('.pick [data-s]').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === state.s));
+  resizeAll();
+}
+document.querySelector('.pick').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.d) state.d = b.dataset.d; if (b.dataset.s) state.s = b.dataset.s; show();
+});
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-next]')) {
+    const sec = e.target.closest('.design'), v = sec.querySelector('input[type=email]').value.trim();
+    if (v) sec.querySelectorAll('.mail').forEach(m => m.textContent = v);
+    state.s = 'code'; show(); const first = sec.querySelector('.otp input'); if (first) first.focus();
+  }
+  if (e.target.closest('[data-prev]')) { state.s = 'email'; show(); }
+});
+
+// ---- candles: a seeded random walk with trend regimes, and a UT Bot-style trailing stop for Buy / Sell ----
+function makeTape(seed, start) {
+  let s = seed, price = start, drift = 0.6;
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  return () => {
+    if (rnd() < 0.045) drift = (rnd() - 0.5) * 3.2;
+    const o = price, c = o + (rnd() - 0.5) * 7 + drift, h = Math.max(o, c) + rnd() * 3.4, l = Math.min(o, c) - rnd() * 3.4;
+    price = c; return { o, h, l, c, v: 0.25 + rnd() * 0.75 };
+  };
+}
+function trail(list, key = 2.2, n = 10) {
+  let atr = null, prev = null;
+  list.forEach((b, i) => {
+    const pc = i ? list[i - 1].c : b.c, tr = Math.max(b.h - b.l, Math.abs(b.h - pc), Math.abs(b.l - pc));
+    atr = atr === null ? tr : (atr * (n - 1) + tr) / n;
+    const loss = key * atr, ps = prev === null ? b.c - loss : prev;
+    const st = b.c > ps && pc > ps ? Math.max(ps, b.c - loss) : b.c < ps && pc < ps ? Math.min(ps, b.c + loss) : b.c > ps ? b.c - loss : b.c + loss;
+    b.stop = st; b.sig = prev !== null ? (b.c > st && pc <= prev ? 'buy' : b.c < st && pc >= prev ? 'sell' : null) : null; prev = st;
+  });
+}
+function tag(ctx, x, y, text, col, below) {
+  ctx.font = '700 11px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const w = ctx.measureText(text).width + 14, h = 18, tip = below ? y + 6 : y - 6, top = below ? tip + 6 : tip - 6 - h;
+  ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, tip); ctx.lineTo(x - 5, below ? tip + 6 : tip - 6); ctx.lineTo(x + 5, below ? tip + 6 : tip - 6); ctx.fill();
+  ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x - w / 2, top, w, h, 4); else ctx.rect(x - w / 2, top, w, h); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillText(text, x, top + h / 2 + .5);
+}
+function Chart(canvas, opts) {
+  const ctx = canvas.getContext('2d'), next = makeTape(opts.seed, opts.start), bars = [];
+  for (let i = 0; i < 260; i++) bars.push(next());
+  let W = 0, H = 0;
+  const api = {
+    resize() { const r = canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2); W = r.width; H = r.height; if (!W) return; canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); },
+    push() { bars.push(next()); if (bars.length > 600) bars.splice(0, bars.length - 600); },
+    draw(shift) {
+      if (!W) return;
+      const step = W < 600 ? 9 : opts.step, n = Math.ceil(W / step) + 2, view = bars.slice(-n - 1);
+      trail(bars);
+      let hi = -Infinity, lo = Infinity; view.forEach(b => { hi = Math.max(hi, b.h, b.stop); lo = Math.min(lo, b.l, b.stop); });
+      if (opts.levels) { const L = opts.levelsFor(view); hi = Math.max(hi, L.t3); lo = Math.min(lo, L.sl - (L.t1 - L.buy) * .3); }
+      const top = H * opts.top, bot = H * opts.bot, y = p => bot - (p - lo) / (hi - lo || 1) * (bot - top);
+      ctx.clearRect(0, 0, W, H);
+      const R = W - (opts.pad > 100 && W >= 860 ? opts.pad - 20 : 0);
+      ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 1;
+      for (let g = 0; g < H; g += 64) { ctx.beginPath(); ctx.moveTo(0, g + .5); ctx.lineTo(W, g + .5); ctx.stroke(); }
+      for (let g = 0; g < W; g += 96) { ctx.beginPath(); ctx.moveTo(g + .5, 0); ctx.lineTo(g + .5, H); ctx.stroke(); }
+      const x0 = W - view.length * step + step / 2 - shift * step - (opts.pad > 100 && W < 860 ? 30 : opts.pad || 0), bw = Math.max(3, step * .62);
+      view.forEach((b, i) => { const x = x0 + i * step; ctx.fillStyle = 'rgba(255,255,255,.055)'; ctx.fillRect(x - bw / 2, H - b.v * H * .1, bw, b.v * H * .1); });
+      if (opts.levels) {
+        const L = opts.levelsFor(view), from = x0 + L.at * step;
+        if (opts.onLevels) opts.onLevels(L);
+        ctx.fillStyle = 'rgba(245,165,36,.10)'; ctx.fillRect(from - 3 * step, y(L.buy), 3 * step, y(L.sl) - y(L.buy));
+        const line = (p, col, w, dash, text) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash ? [6, 5] : []); ctx.beginPath(); ctx.moveTo(from, y(p) + .5); ctx.lineTo(R, y(p) + .5); ctx.stroke(); ctx.setLineDash([]);
+          ctx.font = '600 11px "IBM Plex Mono", monospace'; const tw = ctx.measureText(text).width + 12, tx = R - 86 - tw;
+          ctx.fillStyle = 'rgba(11,14,20,.85)'; ctx.fillRect(tx, y(p) - 9, tw, 18); ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(tx + .5, y(p) - 8.5, tw - 1, 17);
+          ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = col; ctx.fillText(text, tx + 6, y(p) + .5); };
+        line(L.t3, C.up, 1, true, 'T3 ' + L.t3.toFixed(2)); line(L.t2, C.up, 1, true, 'T2 ' + L.t2.toFixed(2)); line(L.t1, C.up, 1, true, 'T1 ' + L.t1.toFixed(2) + ' ✓');
+        line(L.buy, C.up, 2, false, 'BUY ' + L.buy.toFixed(2)); line(L.sl, C.down, 2, false, 'SL / SELL ' + L.sl.toFixed(2));
+      }
+      if (opts.stop) {
+        ctx.lineWidth = 2; ctx.setLineDash([2, 4]);
+        for (let i = 1; i < view.length; i++) { const a = view[i - 1], b = view[i]; ctx.strokeStyle = b.c > b.stop ? 'rgba(34,171,148,.55)' : 'rgba(247,82,95,.55)';
+          ctx.beginPath(); ctx.moveTo(x0 + (i - 1) * step, y(a.stop)); ctx.lineTo(x0 + i * step, y(b.stop)); ctx.stroke(); }
+        ctx.setLineDash([]);
+      }
+      view.forEach((b, i) => {
+        const x = x0 + i * step, col = b.c >= b.o ? C.up : C.down;
+        ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, y(b.h)); ctx.lineTo(Math.round(x) + .5, y(b.l)); ctx.stroke();
+        ctx.fillStyle = col; ctx.fillRect(x - bw / 2, Math.min(y(b.o), y(b.c)), bw, Math.max(1.5, Math.abs(y(b.c) - y(b.o))));
+      });
+      if (opts.signals) view.forEach((b, i) => { if (b.sig) tag(ctx, x0 + i * step, b.sig === 'buy' ? y(b.l) : y(b.h), b.sig === 'buy' ? 'BUY' : 'SELL', b.sig === 'buy' ? C.up : C.down, b.sig === 'buy'); });
+      const last = view[view.length - 1], ly = y(last.c), lc = last.c >= last.o ? C.up : C.down;
+      ctx.setLineDash([3, 3]); ctx.strokeStyle = lc; ctx.globalAlpha = .6; ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(W, ly); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+      ctx.fillStyle = lc; ctx.fillRect(R - 76, ly - 10, 76, 20); ctx.fillStyle = '#fff'; ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(last.c.toFixed(2), R - 38, ly + .5);
+      if (opts.onPrice) opts.onPrice(last.c, view[0].o);
+    },
+  };
+  return api;
+}
+// A: full-screen tape with signals; B: today's levels drawn on the chart
+const charts = {
+  A: Chart(document.getElementById('cvA'), { seed: 7, start: 1390, step: 14, top: .16, bot: .86, stop: true, signals: true }),
+  B: Chart(document.getElementById('cvB'), { seed: 41, start: 1384, step: 12, top: .24, bot: .88, stop: false, signals: true, pad: 40, levels: true,
+    levelsFor(view) { const k = Math.max(0, view.length - 70), seg = view.slice(k, k + 3); const buy = Math.max(...seg.map(b => b.h)), sl = Math.min(...seg.map(b => b.l)), w = buy - sl;
+      return { at: k + 3, buy, sl, t1: buy + w, t2: buy + 2 * w, t3: buy + 3 * w }; },
+    onPrice(c, o) { const ch = c - o, el = document.getElementById('pxB'); el.style.color = ch >= 0 ? C.up : C.down;
+      el.innerHTML = c.toFixed(2) + ' <small>' + (ch >= 0 ? '+' : '') + ch.toFixed(2) + ' (' + (ch >= 0 ? '+' : '') + (ch / o * 100).toFixed(2) + '%)</small>'; } }),
+};
+const lv = (view) => { const k = Math.max(0, view.length - 70), seg = view.slice(k, k + 3); const buy = Math.max(...seg.map(b => b.h)), sl = Math.min(...seg.map(b => b.l)), w = buy - sl;
+  return { at: k + 3, buy, sl, t1: buy + w, t2: buy + 2 * w, t3: buy + 3 * w }; };
+const priceTo = (id) => (c, o) => { const ch = c - o, el = document.getElementById('px' + id); el.style.color = ch >= 0 ? C.up : C.down;
+  el.innerHTML = c.toFixed(2) + ' <small>' + (ch >= 0 ? '+' : '') + ch.toFixed(2) + ' (' + (ch >= 0 ? '+' : '') + (ch / o * 100).toFixed(2) + '%)</small>'; };
+charts.B2 = Chart(document.getElementById('cvB2'), { seed: 19, start: 1640, step: 12, top: .24, bot: .7, signals: true, stop: true, onPrice: priceTo('B2') });
+charts.B3 = Chart(document.getElementById('cvB3'), { seed: 88, start: 2920, step: 12, top: .22, bot: .72, signals: true, levels: true, levelsFor: lv, pad: 30, onPrice: priceTo('B3') });
+charts.B4 = Chart(document.getElementById('cvB4'), { seed: 63, start: 24280, step: 12, top: .24, bot: .9, signals: true, levels: true, levelsFor: lv, pad: 30, onPrice: priceTo('B4'),
+  onLevels(L) { const f = (x) => x.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), set = (id, v) => { const e = document.getElementById(id); if (e.textContent !== v) e.textContent = v; };
+    set('tkBuy', f(L.buy)); set('tkSell', f(L.sl)); set('tkT1', f(L.t1) + ' ✓'); set('tkT2', f(L.t2)); set('tkT3', f(L.t3)); } });
+charts.B5 = Chart(document.getElementById('cvB5'), { seed: 41, start: 1384, step: 13, top: .2, bot: .78, signals: true, stop: true, levels: true, levelsFor: lv, pad: 470, onPrice: priceTo('B5') });
+function resizeAll() { Object.values(charts).forEach(c => { c.resize(); c.draw(0); }); }
+addEventListener('resize', resizeAll);
+let lastT = performance.now(), acc = 0;
+function frame(t) {
+  acc += (t - lastT) / 900; lastT = t;
+  while (acc >= 1) { charts[state.d] && charts[state.d].push(); acc -= 1; }
+  if (charts[state.d]) charts[state.d].draw(acc);
+  requestAnimationFrame(frame);
+}
+resizeAll(); if (!still) requestAnimationFrame(frame);
+
+// ticker for A
+const names = ['RELIANCE', 'HDFCBANK', 'ICICIBANK', 'INFY', 'TCS', 'SBIN', 'BHARTIARTL', 'ITC', 'LT', 'AXISBANK', 'KOTAKBANK', 'BAJFINANCE', 'MARUTI', 'TITAN', 'SUNPHARMA'];
+const tick = names.map((s, i) => { const ch = Math.sin(i * 2.3) * 1.8; return '<span><b style="color:#e6e8ee;margin-right:6px">' + s + '</b><span style="color:' + (ch >= 0 ? C.up : C.down) + '">' + (ch >= 0 ? '▲ +' : '▼ ') + ch.toFixed(2) + '%</span></span>'; }).join('');
+const tape = document.getElementById('tapeA'); tape.innerHTML = tick + tick;
+if (!still) tape.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-50%)' }], { duration: 40000, iterations: Infinity });
+
+// C: a Nifty 50 heatmap wall that keeps ticking
+const all = ['ADANIENT', 'ADANIPORTS', 'APOLLOHOSP', 'ASIANPAINT', 'AXISBANK', 'BAJAJ-AUTO', 'BAJFINANCE', 'BAJAJFINSV', 'BEL', 'BHARTIARTL', 'CIPLA', 'COALINDIA', 'DRREDDY', 'EICHERMOT', 'ETERNAL', 'GRASIM',
+  'HCLTECH', 'HDFCBANK', 'HDFCLIFE', 'HINDALCO', 'HINDUNILVR', 'ICICIBANK', 'INDIGO', 'INFY', 'ITC', 'JIOFIN', 'JSWSTEEL', 'KOTAKBANK', 'LT', 'M&M', 'MARUTI', 'MAXHEALTH', 'NESTLEIND', 'NTPC', 'ONGC',
+  'POWERGRID', 'RELIANCE', 'SBILIFE', 'SBIN', 'SHRIRAMFIN', 'SUNPHARMA', 'TATACONSUM', 'TATASTEEL', 'TCS', 'TECHM', 'TITAN', 'TRENT', 'ULTRACEMCO', 'WIPRO', 'NIFTY 50'];
+const wall = document.getElementById('wallC'), tiles = [];
+for (let k = 0; k < 4; k++) all.forEach((s, i) => { const d = document.createElement('div'); d.className = 'tile'; wall.appendChild(d); tiles.push({ d, s, ch: Math.sin((i + k * 7) * 1.7) * 2.2 }); });
+function paint(t) {
+  const a = Math.min(1, Math.abs(t.ch) / 2.4), col = t.ch >= 0 ? 'rgba(34,171,148,' + (0.18 + a * 0.62) + ')' : 'rgba(247,82,95,' + (0.18 + a * 0.62) + ')';
+  t.d.style.background = col; t.d.innerHTML = '<b>' + t.s + '</b><span>' + (t.ch >= 0 ? '+' : '') + t.ch.toFixed(2) + '%</span>';
+}
+tiles.forEach(paint);
+if (!still) setInterval(() => { for (let i = 0; i < 6; i++) { const t = tiles[Math.floor(Math.random() * tiles.length)]; t.ch = Math.max(-3, Math.min(3, t.ch + (Math.random() - .5) * 1.2)); paint(t); } }, 700);
+
+{ const q = new URLSearchParams(location.search); if (/^(A|B|B[2-5]|C)$/.test(q.get('d'))) state.d = q.get('d'); if (q.get('s') === 'code') state.s = 'code'; }
+show();
+</script>
+</body>
+</html>

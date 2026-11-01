@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NSE Live Chart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script>try { const t = localStorage.getItem('nse-live-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<style>
+/* A trading terminal: toolbar and market strip on top, watchlist left, chart on the right. */
+:root {
+  --bg: #eef1f6;
+  --panel: #ffffff;
+  --raise: #f5f7fb;
+  --ink: #131722;
+  --muted: #6a6f7d;
+  --line: #e0e3eb;
+  --accent: #2962ff;      /* entry, focus, EMA 9 */
+  --up: #089981;          /* buy, target, up candles */
+  --down: #f23645;        /* sell, stop, down candles */
+  --range: #e08a00;       /* opening range, EMA 21 */
+  --up-soft: rgba(8, 153, 129, .12);
+  --down-soft: rgba(242, 54, 69, .12);
+  --sel: rgba(41, 98, 255, .10);
+  --shadow: 0 1px 2px rgba(19, 23, 34, .06);
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f121a; --panel: #161a25; --raise: #1e2230; --ink: #d9dce3; --muted: #8b90a0; --line: #262b3a;
+    --accent: #5b8cff; --up: #22ab94; --down: #f7525f; --range: #f5a524;
+    --up-soft: rgba(34, 171, 148, .16); --down-soft: rgba(247, 82, 95, .16); --sel: rgba(91, 140, 255, .16);
+    --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f121a; --panel: #161a25; --raise: #1e2230; --ink: #d9dce3; --muted: #8b90a0; --line: #262b3a;
+  --accent: #5b8cff; --up: #22ab94; --down: #f7525f; --range: #f5a524;
+  --up-soft: rgba(34, 171, 148, .16); --down-soft: rgba(247, 82, 95, .16); --sel: rgba(91, 140, 255, .16);
+  --shadow: none; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 13px; line-height: 1.45; }
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.up { color: var(--up); } .down { color: var(--down); }
+
+.app { height: 100vh; display: grid; gap: 1px; background: var(--line);
+  grid-template-columns: 264px minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas: "top top" "strip strip" "rail chart"; }
+
+/* ---- toolbar ---- */
+.top { grid-area: top; background: var(--panel); display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 8px 14px; min-height: 52px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.95rem; letter-spacing: -0.01em; white-space: nowrap; }
+.brand svg { color: var(--accent); }
+.vr { width: 1px; align-self: stretch; background: var(--line); }
+.symhead { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.symhead h1 { margin: 0; font-size: 1.05rem; font-weight: 700; white-space: nowrap; }
+.symhead .nm { color: var(--muted); font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.last { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.last b { font-family: var(--f-mono); font-size: 1.05rem; font-weight: 600; }
+.last span { font-family: var(--f-mono); font-size: 0.8rem; }
+.spacer { flex: 1; }
+.seg { display: inline-flex; gap: 2px; padding: 2px; background: var(--raise); border-radius: 8px; flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; color: var(--muted); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.8rem; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
+.ibtn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 500; white-space: nowrap; }
+.ibtn:hover { background: var(--raise); }
+.ibtn[aria-pressed="true"] { border-color: var(--up); color: var(--up); background: var(--up-soft); }
+.ibtn svg { flex: none; }
+a.ibtn { text-decoration: none; }
+.signout:hover { border-color: var(--down); color: var(--down); background: var(--down-soft); }
+.acct { position: relative; }
+.acct summary { list-style: none; cursor: pointer; }
+.acct summary::-webkit-details-marker { display: none; }
+.acct .av { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; font: 700 0.8rem var(--f-body); text-transform: uppercase;
+  color: #fff; background: linear-gradient(135deg, var(--up), var(--accent)); box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--line); }
+.acct summary:hover .av, .acct[open] .av { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px var(--accent); }
+.acct-box { position: absolute; right: 0; top: 40px; z-index: 30; width: 240px; display: grid; gap: 8px; padding: 12px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,.28); }
+.acct-k { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.who { font-family: var(--f-mono); font-size: 0.78rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-box .signout { justify-content: center; margin-top: 4px; }
+[hidden] { display: none !important; }
+.live { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+.live i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.live.open i { background: var(--up); box-shadow: 0 0 0 3px var(--up-soft); animation: pulse 2s infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .live.open i { animation: none; } }
+
+/* ---- market strip ---- */
+.strip { grid-area: strip; background: var(--panel); display: flex; align-items: center; gap: 18px; padding: 6px 14px; overflow-x: auto; white-space: nowrap; font-size: 0.78rem; color: var(--muted); min-height: 32px; }
+.strip b { font-family: var(--f-mono); font-weight: 600; color: var(--ink); }
+.strip .bar { display: inline-flex; width: 120px; height: 6px; border-radius: 3px; overflow: hidden; background: var(--raise); vertical-align: middle; margin-left: 6px; }
+.strip .bar i { display: block; height: 100%; }
+
+/* ---- watchlist ---- */
+.rail { grid-area: rail; background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+.rail-head { padding: 10px 10px 8px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); }
+.rail-head .t { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.search input { width: 100%; font: 0.82rem var(--f-body); padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--raise); color: var(--ink); }
+.filters { display: flex; gap: 2px; padding: 2px; background: var(--raise); border-radius: 8px; }
+.filters button { flex: 1; border: 0; background: transparent; color: var(--muted); padding: 4px 0; border-radius: 6px; cursor: pointer; font-size: 0.74rem; font-weight: 500; }
+.filters button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
+.list { overflow-y: auto; flex: 1; min-height: 0; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; width: 100%; text-align: left; border: 0; border-left: 3px solid transparent; border-bottom: 1px solid var(--line); background: transparent; padding: 7px 10px 7px 9px; cursor: pointer; }
+.row:hover { background: var(--raise); }
+.row[aria-current="true"] { background: var(--sel); border-left-color: var(--accent); }
+.row .sym { font-weight: 600; font-size: 0.84rem; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.row .px { font-family: var(--f-mono); font-size: 0.82rem; text-align: right; }
+.row .st { font-size: 0.72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .chg { font-family: var(--f-mono); font-size: 0.74rem; text-align: right; }
+.row.idx .sym { font-size: 0.9rem; }
+.tag { font-size: 0.64rem; padding: 0 5px; border-radius: 4px; background: var(--raise); color: var(--muted); font-weight: 500; }
+.score { font-family: var(--f-mono); font-size: 0.68rem; padding: 0 5px; border-radius: 4px; background: var(--raise); color: var(--muted); font-weight: 600; }
+.score.p { color: var(--up); background: var(--up-soft); } .score.m { color: var(--down); background: var(--down-soft); }
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; background: var(--muted); }
+.dot.target { background: var(--up); } .dot.stop { background: var(--down); } .dot.flat { background: var(--accent); }
+
+/* ---- chart ---- */
+.chartcol { grid-area: chart; background: var(--panel); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.ctools { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.ctools .lbl { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); padding: 3px 9px; border-radius: 999px; cursor: pointer; font-size: 0.76rem; font-weight: 500; }
+.chip i { width: 10px; height: 3px; border-radius: 2px; background: currentColor; opacity: .4; }
+.chip[aria-pressed="true"] { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 30%, var(--line)); }
+.chip[aria-pressed="true"] i { opacity: 1; }
+.pop { position: relative; }
+.pop summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; color: var(--muted); }
+.pop summary::-webkit-details-marker { display: none; }
+.pop summary:hover { background: var(--raise); color: var(--ink); }
+.pop .box { position: absolute; z-index: 10; top: 32px; left: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.18); display: grid; gap: 10px; width: 220px; }
+.pop .box h4 { margin: 0; font-size: 0.82rem; }
+.pop .seg { width: 100%; } .pop .seg button { flex: 1; padding: 4px 6px; }
+.pop .hachk input { width: auto; }
+.pop .poprow { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--muted); }
+.pop label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--muted); }
+.pop input { width: 72px; font: 0.8rem var(--f-mono); padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--raise); color: var(--ink); }
+.pop input[readonly] { cursor: default; color: var(--muted); }
+.pop .fine { margin: 0; }
+.chartbox { position: relative; flex: 1; min-height: 360px; }
+#chart { position: absolute; inset: 0; }
+.legend { position: absolute; top: 6px; left: 8px; z-index: 3; pointer-events: none; display: grid; gap: 2px; font-size: 0.74rem; max-width: calc(100% - 96px); padding: 4px 8px; border-radius: 6px; background: color-mix(in srgb, var(--panel) 86%, transparent); }
+.legend .ln { display: flex; flex-wrap: wrap; gap: 0 10px; align-items: baseline; }
+.legend .ttl { font-weight: 600; color: var(--ink); font-size: 0.82rem; }
+.legend .k { color: var(--muted); }
+.legend .v { font-family: var(--f-mono); }
+.chartmsg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--muted); z-index: 4; background: var(--panel); }
+.chartmsg.on { display: flex; }
+.cfoot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding: 6px 12px; border-top: 1px solid var(--line); font-size: 0.72rem; color: var(--muted); }
+
+.fine { color: var(--muted); font-size: 0.72rem; line-height: 1.5; }
+.err { color: var(--down); }
+
+/* ---- toasts ---- */
+.toasts { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20; display: grid; gap: 8px; max-width: min(340px, calc(100vw - 32px)); }
+.toast { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 10px 12px; font-size: 0.8rem; box-shadow: 0 8px 28px rgba(0,0,0,.22); }
+.toast.buy { border-left-color: var(--up); } .toast.sell { border-left-color: var(--down); }
+.toast b { font-family: var(--f-mono); }
+.toast button { float: right; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; margin-left: 8px; }
+
+/* ---- smaller screens ---- */
+@media (max-width: 1200px) {
+  .app { grid-template-columns: 240px minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .app { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 100vh; grid-template-rows: auto auto 60vh 300px; grid-template-areas: "top" "strip" "chart" "rail"; }
+  .chartbox { min-height: 300px; }
+  .symhead .nm { display: none; }
+  .legend .ln:nth-child(n+4) { display: none; }
+  .vr { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 19V9M9 19V5M14 19v-7M19 19V8"/></svg>
+      NSE Live
+    </div>
+    <span class="vr"></span>
+    <div class="symhead"><h1 id="sym"></h1><span class="nm" id="nm"></span></div>
+    <div class="last" id="last"></div>
+    <div class="seg" id="tfSeg" role="group" aria-label="Timeframe">
+      <button type="button" data-v="5m" aria-pressed="true">5m</button>
+      <button type="button" data-v="15m" aria-pressed="false">15m</button>
+      <button type="button" data-v="1h" aria-pressed="false">1H</button>
+      <button type="button" data-v="1d" aria-pressed="false">1D</button>
+    </div>
+    <span class="spacer"></span>
+    <span class="live" id="live"><i></i><span id="liveTxt">Connecting…</span></span>
+    <button type="button" class="ibtn" id="alertBtn" aria-pressed="false">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      <span>Alerts off</span>
+    </button>
+    <button type="button" class="ibtn" id="themeBtn" aria-label="Switch light or dark theme">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+    <!-- the hosted chart (with its sign-in) shows an account menu: who is signed in, and Sign out; the local chart has no login -->
+    <details class="acct" id="acct" hidden>
+      <summary aria-label="Account" title="Account"><span class="av" id="av">?</span></summary>
+      <div class="acct-box">
+        <div class="acct-k">Signed in as</div>
+        <div class="who" id="who"></div>
+        <a class="ibtn signout" id="signOut" href="#">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          <span>Sign out</span>
+        </a>
+      </div>
+    </details>
+  </header>
+
+  <div class="strip" id="summary"><span>Loading the Nifty 50 (about 30 seconds the first time)…</span></div>
+
+  <aside class="rail" aria-label="Watchlist">
+    <div class="rail-head">
+      <div class="t">Watchlist · Nifty 50</div>
+      <div class="search"><input id="q" type="search" placeholder="Search symbol" aria-label="Find a symbol"></div>
+      <div class="filters" role="group" aria-label="Filter stocks">
+        <button type="button" data-f="all" aria-pressed="true">All</button>
+        <button type="button" data-f="trig" aria-pressed="false">Broke out</button>
+        <button type="button" data-f="bull" aria-pressed="false">Bullish</button>
+        <button type="button" data-f="bear" aria-pressed="false">Bearish</button>
+      </div>
+    </div>
+    <div class="list" id="list"></div>
+  </aside>
+
+  <section class="chartcol" aria-label="Chart">
+    <div class="ctools">
+      <span class="lbl">Indicators</span>
+      <button type="button" class="chip" data-ind="ut" aria-pressed="true"><i style="background:var(--up)"></i>UT Bot</button>
+      <details class="pop" id="utPop">
+        <summary aria-label="UT Bot settings" title="UT Bot settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></summary>
+        <div class="box">
+          <h4>UT Bot Alerts</h4>
+          <div class="seg" id="utPreset" role="group" aria-label="UT Bot preset">
+            <button type="button" data-k="1" data-a="10" data-h="0">Sensitive</button>
+            <button type="button" data-k="2" data-a="10" data-h="0">Balanced</button>
+            <button type="button" data-k="3" data-a="10" data-h="1">Calm</button>
+          </div>
+          <label>Key value <input type="number" id="utKey" min="0.5" max="10" step="0.5" value="3"></label>
+          <label>ATR period <input type="number" id="utAtr" min="1" max="100" step="1" value="10"></label>
+          <label class="hachk"><span>Signals from Heikin Ashi candles</span><input type="checkbox" id="utHa"></label>
+          <p class="fine" id="utHelp"></p>
+        </div>
+      </details>
+      <button type="button" class="chip" data-ind="levels" aria-pressed="true"><i style="background:var(--range)"></i>Day levels</button>
+    </div>
+    <div class="chartbox">
+      <div class="legend" id="legend" aria-live="off"></div>
+      <div id="chart"></div>
+      <div class="chartmsg" id="chartMsg"></div>
+    </div>
+    <div class="cfoot"><span id="tfNote"></span><span id="utNote"></span></div>
+  </section>
+
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+const IST = 19800, INDEX = 'NIFTY 50';
+const state = { byTime: new Map(), seen: null, alertsOn: false, audio: null, sym: INDEX, tf: '5m', filter: 'all', q: '', data: null, board: [], indexPx: {}, fitted: null,
+  ut: { on: true, key: 3, atr: 10, ha: true }, utSeen: null, show: { levels: true }, vals: {} };
+try { const s = localStorage.getItem('nse-live-sym'); if (s) state.sym = s; const f = localStorage.getItem('nse-live-tf'); if (f) state.tf = f;
+  // nse-live-ut3: the default moved to Calm (key 3, Heikin Ashi): a quarter of key 2's signals flipped back within
+  // 6 candles, 7 % of Calm's. Older saved settings start over on it.
+  const u = JSON.parse(localStorage.getItem('nse-live-ut3') || 'null'); if (u) Object.assign(state.ut, { on: u.on !== false, key: +u.key || 3, atr: +u.atr || 10, ha: !!u.ha });
+  const sh = JSON.parse(localStorage.getItem('nse-live-show') || 'null'); if (sh) Object.assign(state.show, sh); } catch (e) {}
+{ const u = new URLSearchParams(location.search); if (u.get('sym')) state.sym = u.get('sym').toUpperCase(); if (['5m', '15m', '1h', '1d'].includes(u.get('tf'))) state.tf = u.get('tf'); }
+const TF = {
+  '5m': { show: 150, note: '60 sessions of 5-minute candles' },
+  '15m': { show: 100, note: '60 sessions of 15-minute candles' },
+  '1h': { show: 120, note: 'about a year of 1-hour candles' },
+  '1d': { show: 130, note: 'two years of daily candles' },
+};
+
+function tickSize(p, isIndex) {
+  if (isIndex) return 0.05;
+  if (p < 250) return 0.01; if (p < 1000) return 0.05; if (p < 5000) return 0.10;
+  if (p < 10000) return 0.50; if (p < 20000) return 1.00; return 5.00;
+}
+function toTick(p, mode, t) {
+  const n = p / t;
+  const k = mode === 'down' ? Math.floor(n + 1e-9) : mode === 'up' ? Math.ceil(n - 1e-9) : Math.floor(n + 0.5 + 1e-9);
+  return +(k * t).toFixed(2);
+}
+const inr = (x) => '₹' + x.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (x) => x.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const mins = (t) => { const d = new Date((t + IST) * 1000); return d.getUTCHours() * 60 + d.getUTCMinutes(); };
+const clock = (m) => { const h = Math.floor(m / 60), mm = String(m % 60).padStart(2, '0'); return (h > 12 ? h - 12 : h) + ':' + mm + (h >= 12 ? ' PM' : ' AM'); };
+const OPEN = 555, OR_END = 570, NO_AFTER = 870, FLAT = 910;
+const cls = (score) => score >= 1 ? 'p' : score <= -1 ? 'm' : '';
+const signed = (x, d) => (x >= 0 ? '+' : '') + x.toFixed(d);
+
+// ---- the day's levels (same as orb_plan in live.py), closed 5-minute bars of one session ----
+// BUY on a 5-minute close above the 9:15-9:30 high, SL the range low; SELL on a close below the low, SL the high.
+// T1, T2, T3 = 1, 2, 3 range widths past the entry. Entries until 2:30 PM, out by 15:10.
+function rangeLevels(hi, lo, isIndex) {
+  const t = tickSize(hi, isIndex), w = +(hi - lo).toFixed(2);
+  const out = { status: w < 5 * t - 1e-9 ? 'refused' : 'ready', orH: hi, orL: lo, w, t };
+  for (const [side, entry, stop, k] of [['buy', hi, lo, 1], ['sell', lo, hi, -1]])
+    out[side] = { side, entry, stop, targets: [1, 2, 3].map(n => toTick(+(entry + k * n * w).toFixed(2), 'nearest', t)), status: 'waiting', hits: [], exit: null };
+  return out;
+}
+function dayLevels(bars, isIndex) {
+  const rng = bars.filter(b => mins(b[0]) >= OPEN && mins(b[0]) < OR_END);
+  if (rng.length < 3) return { status: 'forming' };
+  const out = rangeLevels(Math.max(...rng.map(b => b[2])), Math.min(...rng.map(b => b[3])), isIndex);
+  if (out.status !== 'ready') return out;
+  const late = mins(bars[bars.length - 1][0]) + 5 >= NO_AFTER;
+  for (const s of [out.buy, out.sell]) {
+    const k = s.side === 'buy' ? 1 : -1;
+    s.status = late ? 'none' : 'waiting';
+    let idx = -1;
+    for (let i = 0; i < bars.length; i++) {
+      const m = mins(bars[i][0]);
+      if (m < OR_END) continue;
+      if (m + 5 > NO_AFTER) break;
+      if (k > 0 ? bars[i][4] > out.orH : bars[i][4] < out.orL) { idx = i; break; }
+    }
+    if (idx < 0) continue;
+    Object.assign(s, { status: 'trig', idx, etime: mins(bars[idx][0]) + 5, fill: bars[idx][4] });
+    for (let i = idx + 1; i < bars.length; i++) {
+      const [ts, o, h, l] = bars[i], m = mins(ts);
+      if (m >= FLAT) { s.exit = { i, px: o, m, how: 'flat' }; break; }
+      if (k > 0 ? l <= s.stop : h >= s.stop) { s.exit = { i, px: k > 0 ? Math.min(s.stop, o) : Math.max(s.stop, o), m: m + 5, how: 'stop' }; break; }
+      while (s.hits.length < 3 && (k > 0 ? h >= s.targets[s.hits.length] : l <= s.targets[s.hits.length])) s.hits.push({ i, m: m + 5 });
+      if (s.hits.length === 3) { s.exit = { i, px: s.targets[2], m: m + 5, how: 't3' }; break; }
+    }
+  }
+  return out;
+}
+
+// UT Bot Alerts (the TradingView script, same maths as ut_bot in live.py): an ATR trailing stop
+// key × ATR from the close; Buy when the close crosses above it, Sell when it crosses below.
+// heikin: follow the Heikin Ashi close (o+h+l+c)/4, the script's option; the ATR stays on the real bars
+function utBot(bars, key, period, heikin) {
+  const stops = new Array(bars.length).fill(null), sig = [], src = bars.map(b => heikin ? (b[1] + b[2] + b[3] + b[4]) / 4 : b[4]);
+  let atr = 0, prev = null;
+  for (let i = 0; i < bars.length; i++) {
+    const b = bars[i];
+    const tr = i ? Math.max(b[2] - b[3], Math.abs(b[2] - bars[i - 1][4]), Math.abs(b[3] - bars[i - 1][4])) : b[2] - b[3];
+    if (i < period - 1) { atr += tr; continue; }
+    atr = i === period - 1 ? (atr + tr) / period : (atr * (period - 1) + tr) / period;
+    const c = src[i], loss = key * atr, ps = prev === null ? 0 : prev, pc = i ? src[i - 1] : c;
+    const s = c > ps && pc > ps ? Math.max(ps, c - loss) : c < ps && pc < ps ? Math.min(ps, c + loss) : c > ps ? c - loss : c + loss;
+    if (prev !== null) {
+      if (c > s && pc <= prev) sig.push([i, 'buy']);
+      else if (c < s && pc >= prev) sig.push([i, 'sell']);
+    }
+    stops[i] = prev = s;
+  }
+  return { stops, sig, src };
+}
+// the candle that holds a 5-minute bar, on a longer timeframe
+function bucket(cs, ts) { let lo = 0, hi = cs.length - 1, ans = null; while (lo <= hi) { const m = (lo + hi) >> 1; if (cs[m][0] <= ts) { ans = cs[m][0]; lo = m + 1; } else hi = m - 1; } return ans; }
+
+// ---- chart ----
+const el = document.getElementById('chart');
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let chart, candles, ut, lines = [];
+function themeChart() {
+  if (!chart) return;
+  chart.applyOptions({
+    layout: { background: { type: 'solid', color: css('--panel') }, textColor: css('--muted'), fontFamily: 'IBM Plex Mono, monospace', fontSize: 11 },
+    grid: { vertLines: { color: css('--line') + '80' }, horzLines: { color: css('--line') + '80' } },
+    rightPriceScale: { borderColor: css('--line') }, timeScale: { borderColor: css('--line') },
+    crosshair: { vertLine: { labelBackgroundColor: css('--ink') }, horzLine: { labelBackgroundColor: css('--ink') } },
+  });
+  candles.applyOptions({ upColor: css('--up'), downColor: css('--down'), borderUpColor: css('--up'), borderDownColor: css('--down'), wickUpColor: css('--up'), wickDownColor: css('--down') });
+  if (state.data) renderChart();
+}
+function initChart() {
+  if (!window.LightweightCharts) { chartMsg('The chart library did not load. It needs an internet connection.'); return; }
+  chart = LightweightCharts.createChart(el, { autoSize: true, timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 6 }, crosshair: { mode: 0 } });
+  candles = chart.addCandlestickSeries({ priceLineVisible: true, priceLineWidth: 1, priceLineStyle: 2 });
+  ut = chart.addLineSeries({ lineWidth: 2, lineStyle: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: false, title: 'UT' });
+  candles.attachPrimitive(levelLines);
+  candles.attachPrimitive(utLabels);
+  chart.subscribeCrosshairMove((param) => showLegend(param && param.time ? param.time : null));
+  candles.priceScale().applyOptions({ scaleMargins: { top: 0.12, bottom: 0.08 } });
+  themeChart();
+}
+// UT Bot Buy / Sell as filled labels like TradingView's, drawn on the chart's own canvas (a series primitive),
+// so they stay on their candle while you scroll and zoom
+class SignalLabels {
+  constructor() { this.items = []; const self = this; this.view = { zOrder: () => 'top', renderer: () => ({ draw: (t) => self.draw(t) }) }; }
+  attached(p) { this.chart = p.chart; this.series = p.series; this.req = p.requestUpdate; }
+  detached() { this.chart = null; }
+  updateAllViews() {}
+  paneViews() { return [this.view]; }
+  set(items) { this.items = items; if (this.req) this.req(); }
+  draw(target) {
+    if (!this.chart || !this.items.length) return;
+    const ts = this.chart.timeScale();
+    target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
+      ctx.save();
+      ctx.font = '700 12px "IBM Plex Sans", "Segoe UI", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (const it of this.items) {
+        const x = ts.timeToCoordinate(it.time), y = this.series.priceToCoordinate(it.price);
+        if (x === null || y === null || x < -40 || x > mediaSize.width + 40) continue;
+        const buy = it.kind === 'buy', text = buy ? 'Buy' : 'Sell', w = ctx.measureText(text).width + 16, hgt = 20;
+        ctx.fillStyle = it.color;
+        const tip = buy ? y + 5 : y - 5, top = buy ? tip + 6 : tip - 6 - hgt, base = buy ? tip + 6 : tip - 6;
+        ctx.beginPath(); ctx.moveTo(x, tip); ctx.lineTo(x - 5, base); ctx.lineTo(x + 5, base); ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x - w / 2, top, w, hgt, 4); else ctx.rect(x - w / 2, top, w, hgt);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.fillText(text, x, top + hgt / 2 + 0.5);
+      }
+      ctx.restore();
+    });
+  }
+}
+const utLabels = new SignalLabels();
+
+// Today's levels as lines from 9:30 to the right edge,
+// each with its name and price written on it, and the 9:15-9:30 range shaded. Drawn under the candles.
+class LevelLines {
+  constructor() { this.lines = []; this.boxes = []; const self = this; this.view = { zOrder: () => 'bottom', renderer: () => ({ draw: (t) => self.draw(t) }) }; }
+  attached(p) { this.chart = p.chart; this.series = p.series; this.req = p.requestUpdate; }
+  detached() { this.chart = null; }
+  updateAllViews() {}
+  paneViews() { return [this.view]; }
+  set(lines, boxes) { this.lines = lines; this.boxes = boxes; if (this.req) this.req(); }
+  draw(target) {
+    if (!this.chart) return;
+    const ts = this.chart.timeScale(), sr = this.series, half = ts.options().barSpacing / 2;
+    target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
+      const X = (t, edge) => { if (t == null) return mediaSize.width; const x = ts.timeToCoordinate(t); return x === null ? null : x + edge * half; };
+      ctx.save();
+      for (const b of this.boxes) {
+        const x1 = X(b.t1, -1), x2 = X(b.t2, -1), y1 = sr.priceToCoordinate(b.hi), y2 = sr.priceToCoordinate(b.lo);
+        if (x1 === null || x2 === null || y1 === null || y2 === null) continue;
+        ctx.fillStyle = b.color; ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+      }
+      ctx.font = '600 11px "IBM Plex Sans", "Segoe UI", sans-serif'; ctx.textBaseline = 'bottom'; ctx.textAlign = 'left';
+      const tags = [];
+      for (const l of this.lines) {
+        const x1 = X(l.t1, -1), x2 = X(l.t2, 1), y = sr.priceToCoordinate(l.price);
+        if (x1 === null || x2 === null || y === null || x2 < 0 || x1 > mediaSize.width) continue;
+        ctx.strokeStyle = l.color; ctx.lineWidth = l.width; ctx.setLineDash(l.dash ? [5, 4] : []);
+        ctx.beginPath(); ctx.moveTo(x1, Math.round(y) + 0.5); ctx.lineTo(x2, Math.round(y) + 0.5); ctx.stroke();
+        if (l.label) tags.push({ l, x: Math.max(x1, 4) + 4, y });
+      }
+      ctx.setLineDash([]);
+      // the names on a solid backing; where lines sit closer than a label is tall (1H, 1D), one name is kept and
+      // the rest are left to the price scale, which tags every level
+      const kept = [];
+      for (const t of tags.sort((a, b) => a.y - b.y)) {
+        if (kept.some(k => Math.abs(k.y - t.y) < 16)) continue;
+        kept.push(t);
+        const w = ctx.measureText(t.l.label).width + 8;
+        ctx.fillStyle = this.bg || 'rgba(0,0,0,.6)'; ctx.fillRect(t.x - 4, t.y - 15, w, 14);
+        ctx.fillStyle = t.l.color; ctx.fillText(t.l.label, t.x, t.y - 2);
+      }
+      ctx.restore();
+    });
+  }
+}
+const levelLines = new LevelLines();
+
+
+function chartMsg(text) { const m = document.getElementById('chartMsg'); m.textContent = text || ''; m.classList.toggle('on', !!text); }
+function candleWhen(ts, daily) {
+  const d = new Date((ts + IST) * 1000);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' }) + (daily ? '' : ' ' + clock(d.getUTCHours() * 60 + d.getUTCMinutes()));
+}
+// a new UT Bot signal on the chart you are looking at: a note on the page, plus sound and notification when alerts are on
+function utAlert(p, bar, kind) {
+  const key = p.symbol + '|' + p.tf + '|' + state.ut.key + '|' + state.ut.atr + '|' + state.ut.ha, ts = bar ? bar[0] : 0;
+  if (!state.utSeen || state.utSeen.key !== key) { state.utSeen = { key, ts }; return; }   // first look: no alert for an old signal
+  if (ts <= state.utSeen.ts) return;
+  state.utSeen.ts = ts;
+  const title = 'UT Bot ' + (kind === 'buy' ? 'Buy' : 'Sell') + ' ' + p.symbol + ' (' + p.tf + ')';
+  const body = 'Close ' + inr(bar[4]) + ' at the ' + candleWhen(ts, p.tf === '1d') + ' candle. A chart signal, not advice. Nothing placed.';
+  toast('<b>' + esc(title) + '</b><br>' + esc(body), kind);
+  if (state.alertsOn) {
+    beep();
+    try { if (window.Notification && Notification.permission === 'granted') new Notification(title, { body }); } catch (e) {}
+  }
+}
+// TradingView-style legend: OHLC and each indicator's value at the candle under the mouse (the last candle otherwise)
+function showLegend(time) {
+  const p = state.data, box = document.getElementById('legend');
+  if (!p) { box.innerHTML = ''; return; }
+  const cs = p.candles || p.bars;
+  let c = time != null ? state.byTime.get(time) : null;
+  if (!c && cs.length) c = cs[cs.length - 1];
+  if (!c) { box.innerHTML = ''; return; }
+  const t = c[0] + IST, v = state.vals, ch = (c[4] - c[1]) / c[1] * 100, dir = c[4] >= c[1] ? 'up' : 'down';
+  let h = '<div class="ln"><span class="ttl">' + esc(p.symbol) + ' · ' + (p.tf || '5m').toUpperCase() + ' · NSE</span><span class="k">' + candleWhen(c[0], p.tf === '1d') + '</span></div>' +
+    '<div class="ln"><span class="k">O <span class="v ' + dir + '">' + fmt(c[1]) + '</span></span><span class="k">H <span class="v ' + dir + '">' + fmt(c[2]) + '</span></span>' +
+    '<span class="k">L <span class="v ' + dir + '">' + fmt(c[3]) + '</span></span><span class="k">C <span class="v ' + dir + '">' + fmt(c[4]) + '</span></span>' +
+    '<span class="v ' + dir + '">' + signed(ch, 2) + '%</span>' + '</div>';
+  if (state.ut.on) {
+    const s = v.ut && v.ut.get(t);
+    h += '<div class="ln"><span class="k">UT Bot ' + state.ut.key + ' ' + state.ut.atr + (state.ut.ha ? ' HA' : '') + '</span>' + (s == null ? '<span class="k">–</span>' : '<span class="v" style="color:' + ((v.utSrc && v.utSrc.has(t) ? v.utSrc.get(t) : c[4]) > s ? css('--up') : css('--down')) + '">' + fmt(s) + '</span>') + '</div>';
+  }
+  const lv = state.levels;
+  if (state.show.levels && lv && lv.status === 'ready') {
+    for (const x of [lv.buy, lv.sell]) {
+      const buy = x.side === 'buy';
+      let st = x.status === 'trig' ? 'in ' + clock(x.etime) : x.status === 'none' ? 'no entry today' : 'waiting for a 5-min close ' + (buy ? 'above' : 'below');
+      if (x.exit) st += ' · ' + { stop: 'SL hit', t3: 'T3 hit', flat: 'out 15:10' }[x.exit.how] + ' ' + clock(x.exit.m);
+      h += '<div class="ln"><span class="v ' + (buy ? 'up' : 'down') + '">' + (buy ? 'BUY &gt; ' : 'SELL &lt; ') + fmt(x.entry) + '</span>' +
+        '<span class="k">SL <span class="v">' + fmt(x.stop) + '</span></span>' +
+        x.targets.map((t, n) => '<span class="k">T' + (n + 1) + ' <span class="v' + (x.hits.length > n ? ' ' + (buy ? 'up' : 'down') : '') + '">' + fmt(t) + (x.hits.length > n ? ' ✓' : '') + '</span></span>').join('') +
+        '<span class="k">' + st + '</span></div>';
+    }
+  } else if (state.show.levels && lv && lv.status === 'forming') h += '<div class="ln"><span class="k">Levels at 9:30 AM, when the 9:15–9:30 range is in</span></div>';
+  else if (state.show.levels && lv && lv.status === 'refused') h += '<div class="ln"><span class="k">No levels today: the opening range is under 5 ticks wide</span></div>';
+  box.innerHTML = h;
+}
+const toMap = (pts) => new Map(pts.map(x => [x.time, x.value]));
+// The candles that have closed. A 15m, 1H or 1D candle is still forming until the 5-minute bars that end it have
+// closed, even when no forming 5-minute bar is in yet. The day's last candle ends with the 15:20 bar, the last one
+// Yahoo reliably has (its 15:25 bar is often missing).
+const SPAN = { '5m': 300, '15m': 900, '1h': 3600, '1d': 86400 };
+function closedCandles(p, cs) {
+  if (!cs.length || !p.bars.length) return cs;
+  if (p.closed < p.bars.length) return cs.slice(0, -1);   // a forming 5-minute bar sits in the last candle
+  const last = cs[cs.length - 1], day = Math.floor((last[0] + IST) / 86400) * 86400 - IST;
+  const end = Math.min(last[0] + SPAN[p.tf || '5m'], day + 925 * 60), doneTo = p.bars[p.closed - 1][0] + 300;
+  return end <= doneTo ? cs : cs.slice(0, -1);
+}
+function renderChart() {
+  const p = state.data, a = dayLevels(p.bars.slice(0, p.closed), p.is_index);
+  state.levels = a;
+  if (!chart) return a;
+  const upc = css('--up'), dnc = css('--down'), sh = state.show;
+  const cs = p.candles || p.bars, daily = p.tf === '1d';
+  state.byTime = new Map(cs.map(c => [c[0] + IST, c]));
+  chart.applyOptions({ timeScale: { timeVisible: !daily } });
+  candles.setData(cs.map(b => ({ time: b[0] + IST, open: b[1], high: b[2], low: b[3], close: b[4] })));
+  state.vals = {};
+  lines.forEach(l => candles.removePriceLine(l)); lines = [];
+    const mk = [];
+  // the levels: the present trading day only (the session on the chart), from its 5-minute bars
+  const ln = [], bx = [];
+  const day = (t) => new Date((t + IST) * 1000).toISOString().slice(0, 10);
+  const dc = cs.filter(c => day(c[0]) === p.session);
+  if (sh.levels && a.status === 'ready' && dc.length) {
+    const t915 = dc[0][0], t1 = bucket(cs, t915 + 900) + IST, at = (i) => bucket(cs, p.bars[i][0]) + IST;
+    if (t1 > t915 + IST) bx.push({ t1: t915 + IST, t2: t1, hi: a.orH, lo: a.orL, color: css('--range') + '22' });
+    const tick = (x, n) => x.hits.length > n ? ' ✓' : '';
+    ln.push({ t1, t2: null, price: a.orH, color: upc, width: 2, label: 'BUY ' + fmt(a.orH) + ' · sell SL' });
+    ln.push({ t1, t2: null, price: a.orL, color: dnc, width: 2, label: 'SELL ' + fmt(a.orL) + ' · buy SL' });
+    a.buy.targets.forEach((t, n) => ln.push({ t1, t2: null, price: t, color: upc, width: 1, dash: true, label: 'Buy T' + (n + 1) + ' ' + fmt(t) + tick(a.buy, n) }));
+    a.sell.targets.forEach((t, n) => ln.push({ t1, t2: null, price: t, color: dnc, width: 1, dash: true, label: 'Sell T' + (n + 1) + ' ' + fmt(t) + tick(a.sell, n) }));
+    for (const x of [a.buy, a.sell]) {
+      if (x.status !== 'trig') continue;
+      const buy = x.side === 'buy';
+      mk.push({ time: at(x.idx), position: buy ? 'belowBar' : 'aboveBar', color: buy ? upc : dnc, shape: buy ? 'arrowUp' : 'arrowDown', text: (buy ? 'BUY ' : 'SELL ') + clock(x.etime) });
+      if (x.exit) mk.push({ time: at(x.exit.i), position: buy ? 'aboveBar' : 'belowBar', color: x.exit.how === 'stop' ? css('--muted') : buy ? upc : dnc, shape: 'circle',
+        text: x.exit.how === 'stop' ? (x.hits.length ? 'T' + x.hits.length + ', then SL' : 'SL') : x.exit.how === 't3' ? 'T3' : 'Out 15:10' });
+    }
+    // today's levels on the price scale
+    const tag = (price, color, title) => lines.push(candles.createPriceLine({ price, color, title, lineVisible: false, axisLabelVisible: true }));
+    tag(a.orH, upc, 'BUY'); tag(a.orL, dnc, 'SELL');
+    a.buy.targets.forEach((t, n) => tag(t, upc, 'T' + (n + 1)));
+    a.sell.targets.forEach((t, n) => tag(t, dnc, 'T' + (n + 1)));
+  }
+  levelLines.bg = css('--panel') + 'd9';
+  levelLines.set(ln, bx);
+  // UT Bot on closed candles only: the forming candle's signal can still vanish before it closes
+  const note = document.getElementById('utNote');
+  if (state.ut.on) {
+    const done = closedCandles(p, cs), u = utBot(done, state.ut.key, state.ut.atr, state.ut.ha);
+    const pts = done.map((b, i) => u.stops[i] === null ? null : { time: b[0] + IST, value: +u.stops[i].toFixed(2), color: u.src[i] > u.stops[i] ? upc : dnc }).filter(Boolean);
+    ut.setData(pts); state.vals.ut = toMap(pts); state.vals.utSrc = new Map(done.map((b, i) => [b[0] + IST, u.src[i]]));
+    utLabels.set(u.sig.map(([i, k]) => ({ time: done[i][0] + IST, kind: k, price: k === 'buy' ? done[i][3] : done[i][2], color: k === 'buy' ? upc : dnc })));
+    const last = u.sig[u.sig.length - 1];
+    note.textContent = 'UT Bot on closed candles · key ' + state.ut.key + ', ATR ' + state.ut.atr + (state.ut.ha ? ', Heikin Ashi' : '');
+    utAlert(p, last && done[last[0]], last && last[1]);
+  } else { ut.setData([]); utLabels.set([]); note.textContent = ''; }
+  mk.sort((x, y) => x.time - y.time);
+  candles.setMarkers(mk);
+  showLegend(null);
+  const key = p.symbol + '|' + p.tf;
+  if (state.fitted !== key) {   // open on the last few sessions; drag or scroll left for earlier days
+    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, cs.length - TF[p.tf || '5m'].show), to: cs.length + 6 });
+    state.fitted = key;
+  }
+  return a;
+}
+
+function render() {
+  const p = state.data; if (!p) return;
+  document.title = p.symbol + ' · NSE Live Chart';
+  document.getElementById('sym').textContent = p.symbol;
+  document.getElementById('nm').textContent = p.is_index ? 'Index · session ' + p.session : p.name + ' · session ' + p.session;
+  const lastBar = p.bars[p.bars.length - 1], last = lastBar ? lastBar[4] : null;
+  const chg = p.prev_close && last ? last - p.prev_close : 0, pct = p.prev_close ? chg / p.prev_close * 100 : 0, dir = chg >= 0 ? 'up' : 'down';
+  document.getElementById('last').innerHTML = '<b class="' + dir + '">' + (last ? fmt(last) : '–') + '</b><span class="' + dir + '">' + signed(chg, 2) + ' (' + signed(pct, 2) + '%)</span>';
+  renderChart();
+}
+
+// the day's levels from live.py, one short line under each stock: ▲ buy side, ▼ sell side
+const trigSide = (p, side) => p && p[side] && p[side].status === 'triggered';
+function planText(p) {
+  if (!p) return '';
+  if (p.status === 'forming') return 'range forming';
+  if (p.status === 'refused') return 'no levels: range too narrow';
+  const one = (s, arrow) => {
+    const x = s.exit, n = s.hits.length;
+    const how = x ? { stop: n ? 'T' + n + ', SL' : 'SL', t3: 'T3', flat: (n ? 'T' + n + ', ' : '') + 'out 15:10' }[x.how] : n ? 'T' + n + ' ✓' : 'open';
+    return '<span class="dot ' + (n ? 'target' : x && x.how === 'stop' ? 'stop' : 'flat') + '"></span>' + arrow + ' ' + s.entry_time + ' → ' + how;
+  };
+  const parts = [trigSide(p, 'buy') && one(p.buy, '▲'), trigSide(p, 'sell') && one(p.sell, '▼')].filter(Boolean);
+  if (parts.length) return parts.join(' · ');
+  if (p.buy.status === 'none' && p.sell.status === 'none') return 'no breakout today';
+  return 'buy &gt; ' + fmt(p.buy.entry) + ' · sell &lt; ' + fmt(p.sell.entry);
+}
+function renderList() {
+  const q = state.q.trim().toUpperCase(), list = document.getElementById('list');
+  const trig = (r) => trigSide(r.plan, 'buy') || trigSide(r.plan, 'sell');
+  const rows = state.board.filter(r => (state.filter === 'all' || (state.filter === 'trig' && trig(r)) || (state.filter === 'bull' && r.score >= 3) || (state.filter === 'bear' && r.score <= -3)) && (!q || r.symbol.includes(q)));
+  const idx = { symbol: INDEX, idx: true, last: state.indexPx.last, prev_close: state.indexPx.prev_close };
+  const all = (!q || 'NIFTY 50'.includes(q) ? [idx] : []).concat(rows);
+  list.innerHTML = '';
+  all.forEach(r => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'row' + (r.idx ? ' idx' : ''); b.setAttribute('aria-current', r.symbol === state.sym);
+    const chg = r.prev_close && r.last ? (r.last - r.prev_close) / r.prev_close * 100 : 0;
+    if (r.idx) b.innerHTML = '<span class="sym">NIFTY 50 <span class="tag">Index</span></span><span class="px">' + (r.last ? fmt(r.last) : '') + '</span>' +
+      '<span class="st">' + (planText(state.indexPlan) || 'the whole market') + '</span>' +
+      '<span class="chg ' + (chg >= 0 ? 'up' : 'down') + '">' + (r.last && r.prev_close ? signed(chg, 2) + '%' : '') + '</span>';
+    else {
+      b.innerHTML = '<span class="sym">' + esc(r.symbol) + (r.score != null ? ' <span class="score ' + cls(r.score) + '" title="' + esc(r.label) + '">' + signed(r.score, 0) + '</span>' : '') + '</span>' +
+        '<span class="px">' + (r.last ? fmt(r.last) : '–') + '</span>' +
+        '<span class="st">' + (planText(r.plan) || (r.label || 'no read yet')) + '</span>' +
+        '<span class="chg ' + (chg >= 0 ? 'up' : 'down') + '">' + signed(chg, 2) + '%</span>';
+    }
+    b.onclick = () => select(r.symbol);
+    list.appendChild(b);
+  });
+  if (!state.board.length && !q) list.insertAdjacentHTML('beforeend', '<p class="fine" style="padding:12px">Loading the Nifty 50 (about 30 seconds the first time)…</p>');
+  else if (!all.length) list.innerHTML = '<p class="fine" style="padding:12px">No stocks match.</p>';
+}
+
+async function getJSON(u) { const r = await fetch(u); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j; }
+async function loadChart() {
+  const sym = state.sym, tf = state.tf;
+  document.getElementById('tfNote').textContent = TF[tf].note + ' · drag or scroll to go back · double-click the price scale to reset';
+  try {
+    const d = await getJSON('/api/chart?sym=' + encodeURIComponent(sym) + '&tf=' + tf);
+    if (sym !== state.sym || tf !== state.tf) return;
+    chartMsg(''); state.data = d; render();
+  }
+  catch (e) {
+    if (sym !== state.sym) return;
+    chartMsg('No chart for ' + sym + ': ' + e.message + '. Pick another symbol from the watchlist.');
+    document.getElementById('sym').textContent = sym;
+  }
+}
+// ---- breakout alerts in this browser: a sound, a notification and a note on the page ----
+function beep() {
+  if (!state.audio) return;
+  const a = state.audio, t0 = a.currentTime;
+  [0, 0.22].forEach(dt => { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = 880; g.gain.setValueAtTime(0.15, t0 + dt); g.gain.exponentialRampToValueAtTime(0.001, t0 + dt + 0.18); o.connect(g).connect(a.destination); o.start(t0 + dt); o.stop(t0 + dt + 0.2); });
+}
+function toast(html, kind) {
+  const box = document.getElementById('toasts'), d = document.createElement('div');
+  d.className = 'toast' + (kind ? ' ' + kind : ''); d.innerHTML = '<button type="button" aria-label="Dismiss">×</button>' + html;
+  d.querySelector('button').onclick = () => d.remove();
+  box.prepend(d); while (box.children.length > 4) box.lastChild.remove();
+}
+function checkBreakouts(day, rows) {
+  const key = 'nse-live-seen-' + day;
+  // a buy is remembered by its symbol, a sell by SYMBOL:sell
+  const hits = [];
+  rows.forEach(r => ['buy', 'sell'].forEach(side => { if (trigSide(r.plan, side)) hits.push({ id: r.symbol + (side === 'sell' ? ':sell' : ''), sym: r.symbol, side, s: r.plan[side] }); }));
+  if (!state.seen || state.seen.day !== day) {
+    let saved = null; try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) {}
+    state.seen = { day, set: new Set(saved || hits.map(h => h.id)) };   // first look today: no alerts for old breakouts
+  }
+  hits.filter(h => !state.seen.set.has(h.id)).forEach(h => {
+    state.seen.set.add(h.id);
+    const x = h.s, title = h.side.toUpperCase() + ' ' + h.sym + ' ' + x.entry_time + (h.side === 'buy' ? ' above ' : ' below ') + fmt(x.entry);
+    const body = 'SL ' + fmt(x.stop) + ' · T1 ' + fmt(x.targets[0]) + ' · T2 ' + fmt(x.targets[1]) + ' · T3 ' + fmt(x.targets[2]) + '. Nothing placed.';
+    toast('<b>' + esc(title) + '</b><br>' + esc(body), h.side === 'buy' ? 'buy' : 'sell');
+    if (state.alertsOn) {
+      beep();
+      try { if (window.Notification && Notification.permission === 'granted') new Notification(title, { body }); } catch (e) {}
+    }
+  });
+  try { localStorage.setItem(key, JSON.stringify([...state.seen.set])); } catch (e) {}
+}
+document.getElementById('alertBtn').addEventListener('click', async (e) => {
+  const b = e.currentTarget;
+  state.alertsOn = !state.alertsOn;
+  if (state.alertsOn) {
+    try { state.audio = state.audio || new (window.AudioContext || window.webkitAudioContext)(); await state.audio.resume(); } catch (err) {}
+    try { if (window.Notification && Notification.permission === 'default') await Notification.requestPermission(); } catch (err) {}
+    beep();
+  }
+  b.setAttribute('aria-pressed', state.alertsOn);
+  b.querySelector('span').textContent = state.alertsOn ? 'Alerts on' : 'Alerts off';
+  b.title = 'Breakouts and UT Bot signals: sound and browser notification';
+});
+
+async function loadStatus() {
+  try {
+    const s = await getJSON('/api/status'), live = document.getElementById('live');
+    live.className = 'live ' + (s.market === 'open' && !s.offline ? 'open' : '');
+    document.getElementById('liveTxt').textContent = (s.offline ? 'Replay ' : s.market === 'open' ? 'Live ' : '') + s.now.slice(11, 16) + ' IST · ' + s.words;
+    state.indexPlan = s.board.index_plan;
+    state.indexPx = { last: s.board.index_last, prev_close: s.board.index_prev_close };
+    if (s.board.stocks.length) {
+      state.board = s.board.stocks; renderList();
+      checkBreakouts(s.now.slice(0, 10), s.board.stocks.concat(s.board.index_plan ? [{ symbol: INDEX, plan: s.board.index_plan }] : []));
+    }
+    const st = s.board.stocks, n = (f) => st.filter(f).length;
+    if (st.length) {
+      const bu = n(r => r.score >= 3), be = n(r => r.score <= -3), mid = st.length - bu - be, w = (x) => (100 * x / st.length).toFixed(1) + '%';
+      document.getElementById('summary').innerHTML =
+        '<span>Market <span class="bar"><i style="width:' + w(bu) + ';background:var(--up)"></i><i style="width:' + w(mid) + ';background:var(--muted);opacity:.35"></i><i style="width:' + w(be) + ';background:var(--down)"></i></span></span>' +
+        '<span class="up">Bullish <b class="up">' + bu + '</b></span><span>Neutral / leaning <b>' + mid + '</b></span><span class="down">Bearish <b class="down">' + be + '</b></span>' +
+        (s.board.breadth != null ? '<span>Above VWAP <b>' + Math.round(s.board.breadth * 100) + ' %</b></span>' : '') +
+        '<span class="up">Buy triggered <b class="up">' + n(r => trigSide(r.plan, 'buy')) + '</b></span>' +
+        '<span class="down">Sell triggered <b class="down">' + n(r => trigSide(r.plan, 'sell')) + '</b></span>' +
+        '<span>List updated <b>' + s.board.updated + '</b></span>';
+    } else if (s.board.error) document.getElementById('summary').innerHTML = '<span class="err">' + esc(s.board.error) + '</span>';
+  } catch (e) { document.getElementById('liveTxt').textContent = 'Not connected: is live.py still running?'; }
+}
+function select(sym) {
+  state.sym = sym; try { localStorage.setItem('nse-live-sym', sym); } catch (e) {}
+  try { history.replaceState(null, '', '?sym=' + encodeURIComponent(sym) + '&tf=' + state.tf); } catch (e) {}
+  renderList(); loadChart();
+}
+
+document.getElementById('tfSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  [...e.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+  state.tf = b.dataset.v; try { localStorage.setItem('nse-live-tf', state.tf); history.replaceState(null, '', '?sym=' + encodeURIComponent(state.sym) + '&tf=' + state.tf); } catch (err) {}
+  loadChart();
+});
+document.querySelectorAll('#tfSeg button').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === state.tf));
+document.querySelector('.filters').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  [...e.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+  state.filter = b.dataset.f; renderList();
+});
+document.getElementById('q').addEventListener('input', (e) => { state.q = e.target.value; renderList(); });
+
+// indicator switches and UT Bot settings, remembered in this browser
+const utKey = document.getElementById('utKey'), utAtr = document.getElementById('utAtr'), utHa = document.getElementById('utHa');
+// how often each setting fired on the saved Nifty 50 5-minute bars (60 sessions, 50 stocks)
+const UT_RATE = { '1|10|0': '9 a day, 55 % flipped back within 30 min (TradingView default)', '2|10|0': '4 a day, 25 % flipped back within 30 min',
+  '3|10|0': '2.3 a day, 14 % flipped back within 30 min', '1|10|1': '6 a day, 39 % flipped back within 30 min',
+  '2|10|1': '3 a day, 17 % flipped back within 30 min', '3|10|1': '1.9 a day, 9 % flipped back within 30 min' };
+function utSync() {
+  utKey.value = state.ut.key; utAtr.value = state.ut.atr; utHa.checked = state.ut.ha;
+  document.querySelectorAll('#utPreset button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.k === state.ut.key && +b.dataset.a === state.ut.atr && !!+b.dataset.h === state.ut.ha));
+  const r = UT_RATE[state.ut.key + '|' + state.ut.atr + '|' + (state.ut.ha ? 1 : 0)];
+  document.getElementById('utHelp').textContent = 'Stop = key × ATR from the close. Bigger key: fewer signals, later ones. ' + (r ? 'On 5-minute Nifty 50 bars: ' + r + '.' : '');
+}
+function saveInd() { try { localStorage.setItem('nse-live-ut3', JSON.stringify(state.ut)); localStorage.setItem('nse-live-show', JSON.stringify(state.show)); } catch (e) {} }
+function utChange() {
+  const k = parseFloat(utKey.value), n = parseInt(utAtr.value, 10);
+  state.ut.key = k > 0 ? k : 3; state.ut.atr = n >= 1 ? Math.min(n, 100) : 10; state.ut.ha = utHa.checked;
+  utSync(); saveInd(); if (state.data) render();
+}
+[utKey, utAtr, utHa].forEach(x => x.addEventListener('change', utChange));
+document.getElementById('utPreset').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.ut.key = +b.dataset.k; state.ut.atr = +b.dataset.a; state.ut.ha = !!+b.dataset.h;
+  utSync(); saveInd(); if (state.data) render();
+});
+utSync();
+document.querySelectorAll('.chip[data-ind]').forEach(b => {
+  const k = b.dataset.ind;
+  b.setAttribute('aria-pressed', k === 'ut' ? state.ut.on : state.show[k]);
+  b.addEventListener('click', () => {
+    if (k === 'ut') state.ut.on = !state.ut.on; else state.show[k] = !state.show[k];
+    b.setAttribute('aria-pressed', k === 'ut' ? state.ut.on : state.show[k]);
+    saveInd(); if (state.data) render();
+  });
+});
+document.addEventListener('click', (e) => { const pop = document.getElementById('utPop'); if (pop.open && !pop.contains(e.target)) pop.open = false; });
+document.addEventListener('click', (e) => { const a = document.getElementById('acct'); if (a.open && !a.contains(e.target)) a.open = false; });
+
+// theme: follows the computer until switched here
+document.getElementById('themeBtn').addEventListener('click', () => {
+  const dark = css('--bg') === '#0f121a', next = dark ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('nse-live-theme', next); } catch (e) {}
+  themeChart();
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeChart);
+
+initChart(); renderList(); select(state.sym); loadStatus();
+setInterval(loadChart, 30000);
+setInterval(loadStatus, 30000);
+</script>
+</body>
+</html>

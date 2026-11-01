@@ -1,0 +1,11 @@
+{
+  "name": "india-day-trader-skill",
+  "description": "8 Claude skills for intraday trading on NSE: scan charts, time the entry and exit, replay the trade before you risk a rupee, size it with Zerodha's charges, check it against your limits, practise it on paper and watch it on a live chart.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Jagadeesh Kumar"
+  },
+  "license": "MIT",
+  "keywords": ["claude-code", "claude-skills", "day-trading", "nse", "india", "zerodha", "opening-range-breakout", "paper-trading"],
+  "skills": "./"
+}

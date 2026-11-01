@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Sign in · NSE Live</title>
+<link rel="icon" href="/brand/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Space+Grotesk:wght@600;700&display=swap">
+<style>
+/* Sign-in for the private NSE Live chart (design A, "Glass tape"): a candlestick tape that keeps printing,
+   with Buy / Sell labels, behind a glass card. Two steps: the invited email, then the 6-digit code.
+   The candles and the ticker are illustrations, not prices. */
+:root {
+  --bg: #0b0e14; --ink: #e6e8ee; --muted: #8b90a0; --line: rgba(255,255,255,.08);
+  --up: #22ab94; --down: #f7525f; --accent: #5b8cff;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --f-head: "Space Grotesk", "IBM Plex Sans", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); overflow: hidden; }
+button, input { font: inherit; color: inherit; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+.shade { position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 55% 60% at 50% 52%, rgba(11,14,20,.86) 0%, rgba(11,14,20,.5) 55%, rgba(11,14,20,.12) 100%); }
+.ticker { position: fixed; z-index: 3; top: 0; left: 0; right: 0; overflow: hidden; white-space: nowrap; font: 500 12px var(--f-mono); color: var(--muted);
+  border-bottom: 1px solid rgba(255,255,255,.06); background: rgba(11,14,20,.6); backdrop-filter: blur(6px); padding: 10px 0; }
+.tape { display: inline-flex; gap: 28px; padding-left: 16px; }
+.tape b { color: var(--ink); margin-right: 6px; font-weight: 600; }
+main { position: relative; z-index: 2; height: 100%; display: grid; place-items: center; padding: 64px 16px 32px; overflow-y: auto; }
+.card { width: 100%; max-width: 410px; background: rgba(22,26,37,.74); border: 1px solid var(--line); border-radius: 22px; padding: 32px 28px 24px;
+  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); box-shadow: 0 30px 90px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand img { width: 40px; height: 40px; border-radius: 11px; }
+.brand .t { font: 700 1.05rem var(--f-head); } .brand .s { color: var(--muted); font-size: .78rem; }
+h1 { font: 700 1.65rem/1.15 var(--f-head); margin: 26px 0 8px; letter-spacing: -.02em; }
+h1 em { font-style: normal; background: linear-gradient(90deg, var(--up), var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+p.sub { color: var(--muted); margin: 0 0 22px; font-size: .9rem; line-height: 1.55; }
+p.sub b { color: var(--ink); font-weight: 600; word-break: break-all; }
+.field { display: grid; gap: 7px; }
+.field label { font-size: .78rem; font-weight: 600; letter-spacing: .02em; color: #b7bccb; }
+.field input, .otp input { background: rgba(11,14,20,.6); border: 1px solid #2c3244; outline: none; }
+.field input { width: 100%; padding: 13px 14px; border-radius: 11px; font-size: .95rem; }
+.field input:focus, .otp input:focus { border-color: var(--up); box-shadow: 0 0 0 3px rgba(34,171,148,.18); }
+.otp { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.otp input { width: 100%; aspect-ratio: 1 / 1.15; text-align: center; font: 600 1.35rem var(--f-mono); border-radius: 10px; }
+.go { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 16px; width: 100%; padding: 13px; border: 0; border-radius: 12px; cursor: pointer;
+  font-weight: 700; font-size: .98rem; color: #06120f; background: linear-gradient(180deg, #2bc0a6, #1d9a84);
+  box-shadow: 0 10px 26px rgba(34,171,148,.35), inset 0 1px 0 rgba(255,255,255,.25); transition: transform .12s, box-shadow .12s, opacity .12s; }
+.go:hover { transform: translateY(-1px); box-shadow: 0 14px 30px rgba(34,171,148,.45), inset 0 1px 0 rgba(255,255,255,.25); }
+.go:focus-visible, .link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.go[disabled] { opacity: .6; cursor: wait; transform: none; }
+.go .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(6,18,15,.3); border-top-color: #06120f; animation: spin .8s linear infinite; display: none; }
+.go[disabled] .spin { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; color: var(--muted); font-size: .76rem; }
+.link { background: none; border: 0; padding: 0; cursor: pointer; color: var(--muted); font-size: .76rem; text-decoration: underline; text-underline-offset: 3px; }
+.link[disabled] { cursor: default; text-decoration: none; opacity: .7; }
+.msg { display: none; margin: 0 0 16px; padding: 10px 12px; border-radius: 10px; font-size: .82rem; line-height: 1.45; }
+.msg.err { display: block; border: 1px solid rgba(247,82,95,.35); background: rgba(247,82,95,.1); color: #ffb3b9; }
+.msg.ok { display: block; border: 1px solid rgba(34,171,148,.35); background: rgba(34,171,148,.1); color: #9fe3d5; }
+.step2 { display: none; } .card.code .step1 { display: none; } .card.code .step2 { display: block; }
+.foot { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); font-size: .7rem; color: #5f6474; text-align: center; line-height: 1.5; }
+@media (max-width: 480px) { .card { padding: 26px 18px 20px; } h1 { font-size: 1.4rem; } .otp { gap: 6px; } }
+@media (prefers-reduced-motion: reduce) { .go { transition: none; } }
+</style>
+</head>
+<body>
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="shade" aria-hidden="true"></div>
+<div class="ticker" aria-hidden="true"><div class="tape" id="tape"></div></div>
+<main>
+  <section class="card" id="card" aria-live="polite">
+    <div class="brand"><img src="/brand/logo.svg" alt=""><div><div class="t">NSE Live</div><div class="s">Private trading desk</div></div></div>
+
+    <form class="step1" id="f1" novalidate>
+      <h1>Your levels, <em>before the move.</em></h1>
+      <p class="sub">Entry, stop-loss and three targets for every Nifty 50 stock, live from 9:30 AM.</p>
+      <p class="msg" id="m1" role="alert"></p>
+      <div class="field"><label for="email">Invited email</label><input id="email" type="email" placeholder="you@gmail.com" autocomplete="email" inputmode="email" required></div>
+      <button class="go" type="submit" id="b1"><span class="spin" aria-hidden="true"></span>Send my login code</button>
+      <div class="meta"><span>🔒 Invite-only</span><span>Code valid 10 min</span></div>
+    </form>
+
+    <form class="step2" id="f2" novalidate>
+      <h1>Check your <em>inbox.</em></h1>
+      <p class="sub" id="sent">If <b id="mail"></b> is invited, a 6-digit code is on its way. Enter it to open the desk.</p>
+      <p class="msg" id="m2" role="alert"></p>
+      <div class="otp" id="otp" role="group" aria-label="6-digit code"></div>
+      <button class="go" type="submit" id="b2"><span class="spin" aria-hidden="true"></span>Open the desk</button>
+      <div class="meta"><button class="link" type="button" id="back">Use another email</button><button class="link" type="button" id="resend" disabled>Resend in 1:00</button></div>
+    </form>
+
+    <div class="foot">Paper first. Education and tooling, not financial advice.</div>
+  </section>
+</main>
+<script>
+// ---------------------------------------------------------------- sign-in
+const $ = (id) => document.getElementById(id), card = $('card');
+const otp = $('otp');
+otp.innerHTML = Array.from({ length: 6 }, (_, i) => '<input inputmode="numeric" autocomplete="' + (i ? 'off' : 'one-time-code') + '" maxlength="6" aria-label="Digit ' + (i + 1) + '">').join('');
+const boxes = [...otp.children];
+const code = () => boxes.map(b => b.value).join('');
+function fill(digits, from) { digits.split('').slice(0, 6 - from).forEach((d, k) => { boxes[from + k].value = d; }); const nxt = boxes[Math.min(from + digits.length, 5)]; nxt.focus(); }
+boxes.forEach((b, i) => {
+  b.addEventListener('input', () => {
+    const d = b.value.replace(/\D/g, '');
+    b.value = '';
+    if (d) fill(d, i);
+    if (code().length === 6) $('f2').requestSubmit();
+  });
+  b.addEventListener('keydown', (e) => {
+    if (e.key === 'Backspace' && !b.value && i) { boxes[i - 1].value = ''; boxes[i - 1].focus(); e.preventDefault(); }
+    if (e.key === 'ArrowLeft' && i) boxes[i - 1].focus();
+    if (e.key === 'ArrowRight' && i < 5) boxes[i + 1].focus();
+  });
+  b.addEventListener('paste', (e) => { const d = (e.clipboardData.getData('text') || '').replace(/\D/g, ''); if (d) { e.preventDefault(); fill(d, 0); if (code().length === 6) $('f2').requestSubmit(); } });
+});
+function say(id, text, kind) { const m = $(id); m.textContent = text || ''; m.className = 'msg' + (text ? ' ' + (kind || 'err') : ''); }
+async function post(path, data) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: 'same-origin' });
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  return { ok: r.ok, status: r.status, ...j };
+}
+let timer = null;
+function countdown(sec) {
+  const btn = $('resend'); clearInterval(timer); btn.disabled = true;
+  const tick = () => { if (sec <= 0) { clearInterval(timer); btn.disabled = false; btn.textContent = 'Resend code'; return; }
+    btn.textContent = 'Resend in ' + Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); sec -= 1; };
+  tick(); timer = setInterval(tick, 1000);
+}
+async function start(email, again) {
+  const b = again ? $('resend') : $('b1');
+  b.disabled = true;
+  const r = await post('/auth/start', { email }).catch(() => ({ ok: false, error: 'No connection. Try again.' }));
+  if (!again) b.disabled = false;
+  if (!r.ok) {
+    if (again) { say('m2', r.error || 'Could not send a code.'); countdown(r.wait || 60); } else say('m1', r.error || 'Could not send a code.');
+    return false;
+  }
+  $('mail').textContent = email;
+  if (again) say('m2', 'A new code is on its way.', 'ok');
+  countdown(60);
+  return true;
+}
+$('f1').addEventListener('submit', async (e) => {
+  e.preventDefault(); say('m1', '');
+  const email = $('email').value.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { say('m1', 'Enter a valid email.'); $('email').focus(); return; }
+  try { sessionStorage.setItem('nse-login-email', email); } catch (err) {}
+  if (await start(email, false)) { card.classList.add('code'); say('m2', ''); boxes.forEach(b => b.value = ''); boxes[0].focus(); }
+});
+$('f2').addEventListener('submit', async (e) => {
+  e.preventDefault(); say('m2', '');
+  const c = code();
+  if (c.length !== 6) { say('m2', 'Enter all 6 digits.'); boxes[c.length].focus(); return; }
+  $('b2').disabled = true;
+  const r = await post('/auth/verify', { email: $('mail').textContent, code: c }).catch(() => ({ ok: false, error: 'No connection. Try again.' }));
+  if (r.ok) { location.replace('/'); return; }
+  $('b2').disabled = false;
+  say('m2', r.error || 'That code is not right.'); boxes.forEach(b => b.value = ''); boxes[0].focus();
+});
+$('back').addEventListener('click', () => { card.classList.remove('code'); say('m1', ''); $('email').focus(); });
+$('resend').addEventListener('click', () => start($('mail').textContent, true));
+try { const last = sessionStorage.getItem('nse-login-email'); if (last) $('email').value = last; } catch (e) {}
+if (new URLSearchParams(location.search).get('signedout')) say('m1', 'You are signed out.', 'ok');
+$('email').focus();
+
+// ---------------------------------------------------------------- the tape: an illustration, not prices
+const cv = $('bg'), ctx = cv.getContext('2d'), still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const C = { up: '#22ab94', down: '#f7525f' };
+let W = 0, H = 0, seed = 7, price = 1390, drift = .6;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+function next() {
+  if (rnd() < .045) drift = (rnd() - .5) * 3.2;
+  const o = price, c = o + (rnd() - .5) * 7 + drift, h = Math.max(o, c) + rnd() * 3.4, l = Math.min(o, c) - rnd() * 3.4;
+  price = c; return { o, h, l, c, v: .25 + rnd() * .75 };
+}
+const bars = []; for (let i = 0; i < 260; i++) bars.push(next());
+function trail(list, key = 2.2, n = 10) {      // UT Bot style: an ATR trailing stop; Buy / Sell where the close crosses it
+  let atr = null, prev = null;
+  list.forEach((b, i) => {
+    const pc = i ? list[i - 1].c : b.c, tr = Math.max(b.h - b.l, Math.abs(b.h - pc), Math.abs(b.l - pc));
+    atr = atr === null ? tr : (atr * (n - 1) + tr) / n;
+    const loss = key * atr, ps = prev === null ? b.c - loss : prev;
+    const s = b.c > ps && pc > ps ? Math.max(ps, b.c - loss) : b.c < ps && pc < ps ? Math.min(ps, b.c + loss) : b.c > ps ? b.c - loss : b.c + loss;
+    b.stop = s; b.sig = prev !== null ? (b.c > s && pc <= prev ? 'buy' : b.c < s && pc >= prev ? 'sell' : null) : null; prev = s;
+  });
+}
+function resize() { const dpr = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+function draw(shift) {
+  const step = W < 600 ? 9 : 14, n = Math.ceil(W / step) + 2, view = bars.slice(-n - 1);
+  trail(bars);
+  let hi = -Infinity, lo = Infinity; view.forEach(b => { hi = Math.max(hi, b.h, b.stop); lo = Math.min(lo, b.l, b.stop); });
+  const top = H * .16, bot = H * .86, y = p => bot - (p - lo) / (hi - lo || 1) * (bot - top);
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(255,255,255,.035)'; ctx.lineWidth = 1;
+  for (let g = 0; g < H; g += 64) { ctx.beginPath(); ctx.moveTo(0, g + .5); ctx.lineTo(W, g + .5); ctx.stroke(); }
+  for (let g = 0; g < W; g += 96) { ctx.beginPath(); ctx.moveTo(g + .5, 0); ctx.lineTo(g + .5, H); ctx.stroke(); }
+  const x0 = W - view.length * step + step / 2 - shift * step, bw = Math.max(3, step * .62);
+  view.forEach((b, i) => { ctx.fillStyle = 'rgba(255,255,255,.055)'; ctx.fillRect(x0 + i * step - bw / 2, H - b.v * H * .1, bw, b.v * H * .1); });
+  ctx.lineWidth = 2; ctx.setLineDash([2, 4]);
+  for (let i = 1; i < view.length; i++) { const a = view[i - 1], b = view[i]; ctx.strokeStyle = b.c > b.stop ? 'rgba(34,171,148,.55)' : 'rgba(247,82,95,.55)';
+    ctx.beginPath(); ctx.moveTo(x0 + (i - 1) * step, y(a.stop)); ctx.lineTo(x0 + i * step, y(b.stop)); ctx.stroke(); }
+  ctx.setLineDash([]);
+  view.forEach((b, i) => {
+    const x = x0 + i * step, col = b.c >= b.o ? C.up : C.down;
+    ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, y(b.h)); ctx.lineTo(Math.round(x) + .5, y(b.l)); ctx.stroke();
+    ctx.fillStyle = col; ctx.fillRect(x - bw / 2, Math.min(y(b.o), y(b.c)), bw, Math.max(1.5, Math.abs(y(b.c) - y(b.o))));
+  });
+  ctx.font = '700 11px "IBM Plex Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  view.forEach((b, i) => {
+    if (!b.sig) return;
+    const x = x0 + i * step, buy = b.sig === 'buy', col = buy ? C.up : C.down, text = buy ? 'BUY' : 'SELL';
+    const w = ctx.measureText(text).width + 14, h = 18, tip = buy ? y(b.l) + 6 : y(b.h) - 6, t = buy ? tip + 6 : tip - 6 - h;
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, tip); ctx.lineTo(x - 5, buy ? tip + 6 : tip - 6); ctx.lineTo(x + 5, buy ? tip + 6 : tip - 6); ctx.fill();
+    ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x - w / 2, t, w, h, 4); else ctx.rect(x - w / 2, t, w, h); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillText(text, x, t + h / 2 + .5);
+  });
+  const last = view[view.length - 1], ly = y(last.c), lc = last.c >= last.o ? C.up : C.down;
+  ctx.setLineDash([3, 3]); ctx.strokeStyle = lc; ctx.globalAlpha = .6; ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(W, ly); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  ctx.fillStyle = lc; ctx.fillRect(W - 76, ly - 10, 76, 20); ctx.fillStyle = '#fff'; ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.fillText(last.c.toFixed(2), W - 38, ly + .5);
+}
+let lastT = performance.now(), acc = 0;
+function frame(t) {
+  acc += (t - lastT) / 900; lastT = t;
+  while (acc >= 1) { bars.push(next()); if (bars.length > 600) bars.splice(0, bars.length - 600); acc -= 1; }
+  draw(acc); requestAnimationFrame(frame);
+}
+addEventListener('resize', () => { resize(); draw(0); });
+resize(); draw(0); if (!still) requestAnimationFrame(frame);
+const names = ['RELIANCE', 'HDFCBANK', 'ICICIBANK', 'INFY', 'TCS', 'SBIN', 'BHARTIARTL', 'ITC', 'LT', 'AXISBANK', 'KOTAKBANK', 'BAJFINANCE', 'MARUTI', 'TITAN', 'SUNPHARMA'];
+const tick = names.map((s, i) => { const ch = Math.sin(i * 2.3) * 1.8; return '<span><b>' + s + '</b><span style="color:' + (ch >= 0 ? C.up : C.down) + '">' + (ch >= 0 ? '▲ +' : '▼ ') + ch.toFixed(2) + '%</span></span>'; }).join('');
+const tape = $('tape'); tape.innerHTML = tick + tick;
+if (!still && tape.animate) tape.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-50%)' }], { duration: 40000, iterations: Infinity });
+</script>
+</body>
+</html>
