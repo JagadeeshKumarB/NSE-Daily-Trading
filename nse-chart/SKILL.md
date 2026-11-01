@@ -95,8 +95,8 @@ have loaded once.
 
 ## UT Bot Alerts
 
-The same maths as the TradingView script (`ut_bot` in `live.py`, `utBot` in
-the page): a trailing stop Key value × ATR (Wilder, the ATR period) away from
+The same maths as the TradingView script (`ut_bot` in `chart_signals.py`, `utBot`
+in the page): a trailing stop Key value × ATR (Wilder, the ATR period) away from
 the close. While the close stays above it the stop only rises; below it, it
 only falls. **Buy** when the close crosses above the stop, **Sell** when it
 crosses below. "Signals from Heikin Ashi candles" follows the Heikin Ashi

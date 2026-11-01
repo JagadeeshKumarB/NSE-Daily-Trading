@@ -134,7 +134,7 @@ nse-timemachine/  SKILL.md, timemachine.py
 nse-budget/       SKILL.md, size.py, config.example.json
 nse-risk/         SKILL.md, check.py
 nse-paper/        SKILL.md, paper.py
-nse-chart/        SKILL.md, live.py, page.html
+nse-chart/        SKILL.md, live.py (server, commands), chart_data.py, chart_signals.py, chart_alerts.py, page.html
 ref/              PORTING.md (the spec), india_common.py (the India block), SAFETY.md
 tests/            unittest suite + offline NSE fixtures
 ```
